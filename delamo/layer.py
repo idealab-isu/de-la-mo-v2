@@ -548,7 +548,8 @@ class LayerBodyFace(object): # Formerly LayerSurface
     Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part. 
     
     BCType = None # Formerly DelaminationType: None, "NODELAM" "NOMODEL", "COHESIVE", "CONTACT" or, "TIE"
-    # MatchingFace = None # Formerly SurfPair, This would be the matching LayerBodyFace in the adjacent (or non-adjacent) layer or stiffener, assigned by adjacent_layers() ... To maintain immutability of these objects suggest that
+    # MatchingFace = None # Formerly SurfPair, This would be the matching LayerBodyFace in the adjacent (or non-adjacent)
+    # layer or stiffener, assigned by adjacent_layers() ... To maintain immutability of these objects suggest that
     # instead of this attribute, have adjacent_layers() create a dictionary
     # that can be used to look up matching faces. 
 
@@ -594,7 +595,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
 
     
 if __name__=="__main__":
-    Mold = LayerMold.FromFile("CurvedMold1.STEP")
+    Mold = LayerMold.FromFile("../Data/CurvedMold1.STEP")
     Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
     Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
 
@@ -602,6 +603,6 @@ if __name__=="__main__":
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
-    step_writer.Write("Layers.step")
+    step_writer.Write("../Data/Layers.step")
 
     pass
