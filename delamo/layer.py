@@ -23,10 +23,15 @@ from OCC import BRepLib
 from OCC import BRepOffsetAPI
 from OCC import BRepOffset
 from OCC import BRepBuilderAPI
-from OCC.BRepClass import BRepClass_FacePassiveClassifier
+#from OCC.BRepClass import BRepClass_FacePassiveClassifier
+from OCC.BRepClass import BRepClass_FaceExplorer
+from OCC.BRepClass import BRepClass_FClassifier
 from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
 from OCC.BRepTools import breptools_Read
 from OCC.TopExp import TopExp_Explorer
+from OCC.TopAbs import TopAbs_ON
+from OCC.TopAbs import TopAbs_IN
+from OCC.TopAbs import TopAbs_OUT
 from OCC.TopAbs import TopAbs_FACE
 from OCC.TopAbs import TopAbs_VERTEX
 from OCC.TopAbs import TopAbs_EDGE
@@ -50,27 +55,39 @@ from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
 import loaders
 
-def FindOCCPointNormal(Face, refParPoint, OrigPointTolerance):
+
+
+# Parametric space search start location for FindOCCPointNormal()
+FindOCCPointNormal_refParPoint = np.array([0.0,0.1])
+
+def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     """ Given a face, find and return a (point, normal, parPoint)
     that uniquely identifies the face. The point must be 
     significantly farther than tolerance from any edge"""
 
     # Evaluate reference parametric point
     faceSurface = BRep_Tool().Surface(Face)
+    refParPoint = FindOCCPointNormal_refParPoint.copy()
     refPointProps = GeomLProp_SLProps(faceSurface, refParPoint[0], refParPoint[1], 1, OrigPointTolerance)
     faceNormal = gp_Vec(refPointProps.Normal())
     facePoint = refPointProps.Value()
 
+    
+    
     # Check if original reference point is inside tha Face
-    C=BRepClass_FacePassiveClassifier()
-    C.Perform(Face, facePoint, OrigPointTolerance)
-    if (C.State()==TopAbs_ON):
+
+    FaceExplorer=BRepClass_FaceExplorer(Face)
+    
+    C=BRepClass_FClassifier()
+    #FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]),OrigPointTolerance)
+    C.Perform(FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]), OrigPointTolerance)
+    if (C.State()==TopAbs_IN):
         print('Point in Face')
-
-
     sys.modules["__main__"].__dict__.update(globals())
     sys.modules["__main__"].__dict__.update(locals())
     raise ValueError("Break")
+
+
 
     # Find the closest point by this method:
     # https://www.opencascade.com/content/closest-point-step-object
@@ -576,9 +593,9 @@ class LayerBodyFace(object): # Formerly LayerSurface
     Face = None  # TopoDS_Face (not unique; other TopoDS_Faces may exist that also represent this face) 
     Point = None # Numpy Array representing coordinates of a point on the face
     Normal = None # Numpy array representing unit normal pointing away from the
-                  # layerbody. Direction is arbitrary if this face is not
+                  # layerbody at the location of Point. Direction is arbitrary if this face is not
                   # part of a LayerBody
-    ParPoint = None  # Numpy Array representing parametric coordinates of a point on the face
+    ParPoint = None  # Numpy Array representing parametric coordinates of the above point on the face
                      # This is initialized to (0.05,0.05) and passed to OCCFindPointNormal, where
                      # it is updated if the reference parameter is outside the trimmed region
     # There had been an "InitialSurface" boolean... I think this info
@@ -607,7 +624,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
             pass
         pass
     @classmethod
-    def FromOCC(cls,Face,Direction,Owner=None,BCType=None,IsPointingInside=None):
+    def FromOCC(cls,Face,Direction,Owner=None,BCType=None,IsPointingInside=None,OrigPointTolerance=1e-5,OrigNormalTolerance=1e-6):
         """ Create a LayerBodyFace from a TopoDS_Face. 
         IsPointingInside should be None (if this LayerBodyFace is 
         not actually part of a LayerBody, or if the OCC-Evaluated normal
@@ -615,8 +632,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
         that, given a Normal, returns whether  that normal is pointing inside
         the LayerBody."""
 
-        RefParPoint = np.array([0.01,0.01])
-        (Point,Normal,ParPoint)=FindOCCPointNormal(Face,RefParPoint,OrigPointTolerance=1e-5)
+        (Point,Normal,ParPoint)=FindOCCPointNormal(Face,OrigPointTolerance=OrigPointTolerance,OrigNormalTolerance=OrigNormalTolerance)
 
         # For a LayerBodyFace inside a LayerBody, the normal
         # should be pointing outward. 
@@ -636,7 +652,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
 
     
 if __name__=="__main__":
-    Mold = LayerMold.FromFile("../Data/CurvedMold1.STEP")
+    Mold = LayerMold.FromFile("../data/CurvedMold1.STEP")
     Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
     Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
 
