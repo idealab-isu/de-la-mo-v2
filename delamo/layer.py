@@ -623,6 +623,43 @@ class LayerBodyFace(object): # Formerly LayerSurface
             setattr(self,argname,kwargs[argname])
             pass
         pass
+
+    def __eq__(self,other):
+        # Test equality of faces. This checks whether they the faces
+        # share the same underlying geometry (surface object)
+        #
+        # Ideally, it would check for geometric equivalence...
+        # but OpenCascade has no function for this. 
+        #
+        # Since the layer bodies, etc should be built from the same
+        # underlying geometry we should in general be OK.
+        # We do have to be careful, for example, that if we do an
+        # imprint operation on a surface that we don't do a second
+        # imprint operation on the mating surface... because the
+        # 2nd imprint operation would give us another copy of the
+        # geometry that would then not show pointer equivalence
+        
+        ThisSurface = BRep_Tool().Surface(self.Face)
+        OtherSurface = BRep_Tool().Surface(other.Face)
+
+        return ThisSurface is OtherSurface
+
+    # Implement not equal operator
+    def __ne__(self,other):
+        return not(self==other)
+
+
+    # Implement hash operator as a constant.
+    # This makes us a hashable type (can work in a dictionary),
+    # even though there's not a good way to hash this
+    # (though with the current semi-broken equality operator
+    # we might be able to get away with using the id of the underlying surface).
+    #
+    # Returning a constant here means that dictionaries indexed by LayerBodyFace
+    # will perform like lists (but at least you will be able to do direct lookups)
+    def __hash__(self):
+        return 0
+    
     @classmethod
     def FromOCC(cls,Face,Direction,Owner=None,BCType=None,IsPointingInside=None,OrigPointTolerance=1e-5,OrigNormalTolerance=1e-6):
         """ Create a LayerBodyFace from a TopoDS_Face. 
@@ -643,6 +680,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
         return cls(Face=Face,
                    Point=Point,
                    Normal=Normal,
+                   ParPoint=ParPoint,
                    Direction=Direction,
                    Owner=Owner,
                    BCType=BCType)
