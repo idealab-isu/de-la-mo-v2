@@ -23,6 +23,7 @@ from OCC import BRepLib
 from OCC import BRepOffsetAPI
 from OCC import BRepOffset
 from OCC import BRepBuilderAPI
+from OCC.BRepClass import BRepClass_FacePassiveClassifier
 from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
 from OCC.BRepTools import breptools_Read
 from OCC.TopExp import TopExp_Explorer
@@ -49,14 +50,50 @@ from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
 import loaders
 
-
-# id(layerobj)
-
-def FindOCCPointNormal(Face):
-    """ Given a face, find and return a (point, normal)
+def FindOCCPointNormal(Face, refParPoint, OrigPointTolerance):
+    """ Given a face, find and return a (point, normal, parPoint)
     that uniquely identifies the face. The point must be 
     significantly farther than tolerance from any edge"""
-    # ***!!!!! Not implemented yet!
+
+    # Evaluate reference parametric point
+    faceSurface = BRep_Tool().Surface(Face)
+    refPointProps = GeomLProp_SLProps(faceSurface, refParPoint[0], refParPoint[1], 1, OrigPointTolerance)
+    faceNormal = gp_Vec(refPointProps.Normal())
+    facePoint = refPointProps.Value()
+
+    # Check if original reference point is inside tha Face
+    C=BRepClass_FacePassiveClassifier()
+    C.Perform(Face, facePoint, OrigPointTolerance)
+    if (C.State()==TopAbs_ON):
+        print('Point in Face')
+
+
+    sys.modules["__main__"].__dict__.update(globals())
+    sys.modules["__main__"].__dict__.update(locals())
+    raise ValueError("Break")
+
+    # Find the closest point by this method:
+    # https://www.opencascade.com/content/closest-point-step-object
+    # DistCalc = BRepExtrema_DistShapeShape(Face, OrigDirPointVertex)
+    # DistCalc.Perform()
+    # ThisDist = DistCalc.Value()
+    #
+    # if DistCalc.NbSolution() > 0 and ThisDist < ClosestDist:
+    #     ClosestDist = ThisDist
+    #     (ClosestU, ClosestV) = DistCalc.ParOnFaceS1(1)  # Evaluate (u,v) coordinates on this face of closest point
+    #
+    #     # Here is an example of how to extract
+    #     # a normal vector given (U,V) coordinates
+    #     ThisFaceSurface = BRep_Tool().Surface(topods_Face(FaceExp.Current()))
+    #     ClosestUVProps = GeomLProp_SLProps(ThisFaceSurface, ClosestU, ClosestV, 1, OrigDirTolerance)
+    #     ClosestNormalVec = gp_Vec(ClosestUVProps.Normal())
+    #     ClosestNormal = np.array((ClosestNormalVec.X(), ClosestNormalVec.Y(), ClosestNormalVec.Z()), dtype='d')
+    #     if FaceExp.Current().Orientation == TopAbs_REVERSED:
+    #         # Face is reversed from underlying surface -> we need to flip the normal
+    #         ClosestNormal = -ClosestNormal
+    #         pass
+    #     pass
+    # pass
 
     return ("FindOCCPointNormal() not implemented","FindOCCPointNormal() not implemented")
 
@@ -423,9 +460,9 @@ class LayerMold(object):
                 # OrigDirPoint has outward normal component away from the
                 # OrigDirNormal direction
                 
-                # ADARSH: This is an example of how to evaluate point-to-object
+                # This is an example of how to evaluate point-to-object
                 # distance and find (U,V) coordinates.
-                
+
                 # Find the closest point by this method: 
                 # https://www.opencascade.com/content/closest-point-step-object
                 DistCalc=BRepExtrema_DistShapeShape(FaceExp.Current(),OrigDirPointVertex)
@@ -436,7 +473,7 @@ class LayerMold(object):
                     ClosestDist=ThisDist
                     (ClosestU,ClosestV)=DistCalc.ParOnFaceS1(1) # Evaluate (u,v) coordinates on this face of closest point
                     
-                    # ADARSH: Here is an example of how to extract
+                    # Here is an example of how to extract
                     # a normal vector given (U,V) coordinates
                     ThisFaceSurface=BRep_Tool().Surface(topods_Face(FaceExp.Current()))
                     ClosestUVProps = GeomLProp_SLProps(ThisFaceSurface,ClosestU,ClosestV,1,OrigDirTolerance)
@@ -541,6 +578,9 @@ class LayerBodyFace(object): # Formerly LayerSurface
     Normal = None # Numpy array representing unit normal pointing away from the
                   # layerbody. Direction is arbitrary if this face is not
                   # part of a LayerBody
+    ParPoint = None  # Numpy Array representing parametric coordinates of a point on the face
+                     # This is initialized to (0.05,0.05) and passed to OCCFindPointNormal, where
+                     # it is updated if the reference parameter is outside the trimmed region
     # There had been an "InitialSurface" boolean... I think this info
     # should be covered by Direction=="ORIG"
     Direction = None # "ORIG", "OFFSET", "SIDE", or "NODIR", representing the side of the Owning LayerBody which corresponds to this Face
@@ -575,7 +615,8 @@ class LayerBodyFace(object): # Formerly LayerSurface
         that, given a Normal, returns whether  that normal is pointing inside
         the LayerBody."""
 
-        (Point,Normal)=FindOCCPointNormal(Face)
+        RefParPoint = np.array([0.01,0.01])
+        (Point,Normal,ParPoint)=FindOCCPointNormal(Face,RefParPoint,OrigPointTolerance=1e-5)
 
         # For a LayerBodyFace inside a LayerBody, the normal
         # should be pointing outward. 
