@@ -47,9 +47,10 @@ from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
 
 from OCC.STEPControl import STEPControl_Reader
-from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel
-from OCC.STEPControl import STEPControl_Writer,STEPControl_ManifoldSolidBrep
-from OCC.STEPControl import STEPControl_Writer,STEPControl_GeometricCurveSet
+from OCC.STEPControl import STEPControl_Writer
+from OCC.STEPControl import STEPControl_ShellBasedSurfaceModel
+from OCC.STEPControl import STEPControl_ManifoldSolidBrep
+from OCC.STEPControl import STEPControl_GeometricCurveSet
 from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
@@ -58,7 +59,7 @@ import loaders
 
 
 # Parametric space search start location for FindOCCPointNormal()
-FindOCCPointNormal_refParPoint = np.array([0.0,0.1])
+FindOCCPointNormal_refParPoint = np.array([0.05,0.1])
 
 def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     """ Given a face, find and return a (point, normal, parPoint)
@@ -82,7 +83,13 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     #FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]),OrigPointTolerance)
     C.Perform(FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]), OrigPointTolerance)
     if (C.State()==TopAbs_IN):
-        print('Point in Face')
+        return (np.array((facePoint.X(),facePoint.Y(),facePoint.Z()),dtype='d'),
+                np.array((faceNormal.X(),faceNormal.Y(),faceNormal.Z()),dtype='d'),
+                np.array((refParPoint[0],refParPoint[1]),dtype='d'))
+
+    # (vs. we get TopAbs_ON if it is on an edge rather the inside of the face)
+        
+    #    print('Point in Face')
     sys.modules["__main__"].__dict__.update(globals())
     sys.modules["__main__"].__dict__.update(locals())
     raise ValueError("Break")
@@ -641,8 +648,12 @@ class LayerBodyFace(object): # Formerly LayerSurface
         
         ThisSurface = BRep_Tool().Surface(self.Face)
         OtherSurface = BRep_Tool().Surface(other.Face)
-
-        return ThisSurface is OtherSurface
+        #print("ThisSurface=%s" % (str(ThisSurface)))
+        #print("OtherSurface=%s" % (str(OtherSurface)))
+        
+        #print("Equality operator returns %s" % (str(ThisSurface.DumpToString() == OtherSurface.DumpToString())))
+        
+        return ThisSurface.DumpToString() == OtherSurface.DumpToString()
 
     # Implement not equal operator
     def __ne__(self,other):
@@ -690,7 +701,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
 
     
 if __name__=="__main__":
-    Mold = LayerMold.FromFile("../data/CurvedMold1.STEP")
+    Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
     Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
     Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
 
