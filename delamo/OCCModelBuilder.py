@@ -140,6 +140,11 @@ class OCCModelBuilder(object):
         # NOTE: When regenerating layerbodies, do NOT give them new names unless they are being
         # split (which they aren't from this function)
 
+
+
+
+
+
         
         raise NotImplementedError()
 
@@ -215,15 +220,18 @@ if __name__=="__main__":
     Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
     Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
 
-    delaminationlist = [ os.path.join("..","data","nasa-delam-12-1.csv") ]
+    delaminationlist = [ ]
+    #delaminationlist = [ os.path.join("..","data","nasa-delam-12-1.csv") ]
 
-    MB.apply_delaminations(Layer1,Layer2,delaminationlist)
+    defaultBCType = 2
+    FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
+    #MB.apply_delaminations(Layer1,Layer2,delaminationlist)
 
 
     step_writer=STEPControl_Writer()
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
-    step_writer.Write("/tmp/Layers.step")
+    step_writer.Write(os.path.join("..","Data","Layers.step"))
 
     pass

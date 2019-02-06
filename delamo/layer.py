@@ -3,8 +3,7 @@ import os
 import os.path
 
 import numpy as np
-
-
+import math
 
 from OCC.TopoDS import topods
 
@@ -70,58 +69,74 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     faceSurface = BRep_Tool().Surface(Face)
     refParPoint = FindOCCPointNormal_refParPoint.copy()
     refPointProps = GeomLProp_SLProps(faceSurface, refParPoint[0], refParPoint[1], 1, OrigPointTolerance)
+
     faceNormal = gp_Vec(refPointProps.Normal())
+    if Face.Orientation == TopAbs_REVERSED:
+        # Face is reversed from underlying surface -> we need to flip the normal
+        faceNormal = -faceNormal
+        pass
     facePoint = refPointProps.Value()
+    faceParPoint = refParPoint
 
-    
-    
     # Check if original reference point is inside tha Face
-
     FaceExplorer=BRepClass_FaceExplorer(Face)
-    
     C=BRepClass_FClassifier()
-    #FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]),OrigPointTolerance)
     C.Perform(FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]), OrigPointTolerance)
-    if (C.State()==TopAbs_IN):
-        return (np.array((facePoint.X(),facePoint.Y(),facePoint.Z()),dtype='d'),
-                np.array((faceNormal.X(),faceNormal.Y(),faceNormal.Z()),dtype='d'),
-                np.array((refParPoint[0],refParPoint[1]),dtype='d'))
+
+    # If original point is not inside face iterate to find a point inside face
+    if (C.State()!=TopAbs_IN):
+
+        origPoint = facePoint
+        origParPoint = refParPoint
+
+        # Find the closest point by this method:
+        # https://www.opencascade.com/content/closest-point-step-object
+        DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPoint)
+        DistanceCalculator.Perform()
+        currentDist = DistanceCalculator.Value()
+
+        if DistanceCalculator.NbSolution() > 0:
+            closestDist = currentDist
+            # Evaluate (u,v) coordinates on this face of closest point
+            (ClosestU, ClosestV) = DistanceCalculator.ParOnFaceS1(1)
+
+            angleIncrement = 1
+            parIncrement = 0.01
+            for angle in xrange(0,359,angleIncrement):
+                newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
+                newV = ClosestV + parIncrement * math.sin(angle*math.pi/180.0)
+
+                newParPoint = np.array([newU, newV])
+                C.Perform(FaceExplorer, gp_Pnt2d(newParPoint[0], newParPoint[1]), OrigPointTolerance)
+                if (C.State() == TopAbs_IN):
+                    # Evaluate reference parametric point
+                    newPointProps = GeomLProp_SLProps(faceSurface, newParPoint[0], newParPoint[1], 1,
+                                                      OrigPointTolerance)
+                    faceNormal = gp_Vec(newPointProps.Normal())
+                    facePoint = newPointProps.Value()
+                    faceParPoint = newParPoint
+                    if Face.Orientation == TopAbs_REVERSED:
+                        # Face is reversed from underlying surface -> we need to flip the normal
+                        faceNormal = -faceNormal
+                        pass
+
+                    break
+                pass
+
+            pass
+
+        pass
 
     # (vs. we get TopAbs_ON if it is on an edge rather the inside of the face)
         
     #    print('Point in Face')
-    sys.modules["__main__"].__dict__.update(globals())
-    sys.modules["__main__"].__dict__.update(locals())
-    raise ValueError("Break")
+    # sys.modules["__main__"].__dict__.update(globals())
+    # sys.modules["__main__"].__dict__.update(locals())
+    # raise ValueError("Break")
 
-
-
-    # Find the closest point by this method:
-    # https://www.opencascade.com/content/closest-point-step-object
-    # DistCalc = BRepExtrema_DistShapeShape(Face, OrigDirPointVertex)
-    # DistCalc.Perform()
-    # ThisDist = DistCalc.Value()
-    #
-    # if DistCalc.NbSolution() > 0 and ThisDist < ClosestDist:
-    #     ClosestDist = ThisDist
-    #     (ClosestU, ClosestV) = DistCalc.ParOnFaceS1(1)  # Evaluate (u,v) coordinates on this face of closest point
-    #
-    #     # Here is an example of how to extract
-    #     # a normal vector given (U,V) coordinates
-    #     ThisFaceSurface = BRep_Tool().Surface(topods_Face(FaceExp.Current()))
-    #     ClosestUVProps = GeomLProp_SLProps(ThisFaceSurface, ClosestU, ClosestV, 1, OrigDirTolerance)
-    #     ClosestNormalVec = gp_Vec(ClosestUVProps.Normal())
-    #     ClosestNormal = np.array((ClosestNormalVec.X(), ClosestNormalVec.Y(), ClosestNormalVec.Z()), dtype='d')
-    #     if FaceExp.Current().Orientation == TopAbs_REVERSED:
-    #         # Face is reversed from underlying surface -> we need to flip the normal
-    #         ClosestNormal = -ClosestNormal
-    #         pass
-    #     pass
-    # pass
-
-    return ("FindOCCPointNormal() not implemented","FindOCCPointNormal() not implemented")
-
-
+    return (np.array((facePoint.X(), facePoint.Y(), facePoint.Z()), dtype='d'),
+             np.array((faceNormal.X(), faceNormal.Y(), faceNormal.Z()), dtype='d'),
+             np.array((faceParPoint[0], faceParPoint[1]), dtype='d'))
 
 class Layer(object):
     """The Layer is a collection of LayerBodies representing 
