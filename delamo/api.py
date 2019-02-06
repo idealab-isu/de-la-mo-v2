@@ -97,7 +97,7 @@ class DelamoModeler(object):
     LaminateAssembly=None # AssemblyInstrs
     """Variable representing abq.mdb.models['FEModel'].rootAssembly which should be assigned in your initialization script"""
 
-    acisfile=None  # AssemblyInstrs
+    stepfile=None  # AssemblyInstrs
     """Variable wrapped for ABAQUS access representing name of generated CAD file to load"""
     
     # Body number database
@@ -287,7 +287,7 @@ class DelamoModeler(object):
 
         FEModel=assemblyinstrs.preexisting_variable("FEModel")
         LaminateAssembly=assemblyinstrs.preexisting_variable("LaminateAssembly")
-        acisfile=assemblyinstrs.preexisting_variable("acisfile")
+        stepfile=assemblyinstrs.preexisting_variable("stepfile")
         
         # Body number database:
         # Two parts, first a dictionary filled out during initialization phase
@@ -329,7 +329,7 @@ class DelamoModeler(object):
                InitDict=InitDict,
                FEModel=FEModel,
                LaminateAssembly=LaminateAssembly,
-               acisfile=acisfile,
+               stepfile=stepfile,
                BodyNumDB_build=BodyNumDB_build,
                BodyNumDB=BodyNumDB,
                #BodyDB_build=BodyDB_build,
@@ -414,7 +414,7 @@ class DelamoModeler(object):
         #    target_os_path_join = self.initinstrs.wrap_function(os.path.join)
         #    acisfile=self.initstrs.assign_variable("acisfile",target_os_path_join(target_cad_file_path,cad_file_name))
         #    pass
-        acisfile=self.initinstrs.assign_variable("acisfile", cad_file_path_from_script)
+        stepfile=self.initinstrs.assign_variable("stepfile", cad_file_path_from_script)
         
         # Write out the generated python code
         # -----------------------------------------------
@@ -490,7 +490,7 @@ class Part(object):
         # Always reopen file in same set of instructions (assemblyinstrs in this case)
         # immediately before calling PartFromGeometryFile() because
         # Abaqus mixes up files if you have more than one open. 
-        geom_fh=DM.abq_assembly.mdb.openAcis(filename,scaleFromFile=abqC.ON)
+        geom_fh=DM.abq_assembly.mdb.openStep(filename,scaleFromFile=abqC.ON)
         fe_part=DM.FEModel.PartFromGeometryFile(
             geometryFile=geom_fh,
             bodyNum=bodynum, #M.globals["LookupBodies"](M.BodyNumDB,bodyname),
@@ -518,7 +518,7 @@ class Part(object):
         # immediately before calling PartFromGeometryFile() because
         # Abaqus mixes up files if you have more than one open. 
         if not omit_from_FE:
-            geom_fh=DM.abq_assembly.mdb.openAcis(DM.acisfile,scaleFromFile=abqC.ON)
+            geom_fh=DM.abq_assembly.mdb.openStep(DM.stepfile,scaleFromFile=abqC.ON)
             fe_part=DM.FEModel.PartFromGeometryFile(
                 name=gk_layerbody.Name,
                 geometryFile=geom_fh,

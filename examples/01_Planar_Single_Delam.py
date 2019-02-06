@@ -107,7 +107,7 @@ layer1.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 # Create and add point marker for fixed faced boundary condition
 # There is a surface at y=-25 mm  from z= 0...0.2 mm
 # This point identifies it
-FixedPoint=[-20.0,-25.0,0.1] 
+FixedPoint=[-40.0,-50.0,0.1] 
 
 # Define a fixed boundary condition based on that point.
 # EncastreBC is an ABAQUS function that was found by
@@ -115,7 +115,7 @@ FixedPoint=[-20.0,-25.0,0.1]
 # replay (.rpy) file. 
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 2nd layer
@@ -131,7 +131,7 @@ bond_layers(DM,layer1, layer2)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer2.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer2.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 3rd layer
@@ -151,7 +151,7 @@ bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 4th layer 
@@ -165,7 +165,7 @@ bond_layers(DM,layer3, layer4)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer4.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer4.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 5th layer over the layer 4 or the stiffener contour, if present
@@ -179,9 +179,10 @@ bond_layers(DM,layer4, layer5)
     
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
+FixedPoint[1]-=.07 # accommodate outward shift as we go up
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer5.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer5.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 6th layer
@@ -195,7 +196,7 @@ bond_layers(DM,layer5, layer6)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer6.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer6.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 7th layer
@@ -209,7 +210,7 @@ bond_layers(DM,layer6, layer7)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer7.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer7.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
 # Create 8th layer
@@ -223,13 +224,13 @@ bond_layers(DM,layer7, layer8)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer8.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
+                   region=layer8.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 # Can define a "Surface" that is visible in the Abaqus output database
 # This is a direct ABAQUS call on the part object
 # within layer1 (assumes layer1 is not split due to fiber/matrix breakage)
 layer1.singlepart.fe_part.Surface(name="ForceSurface",
-                                  side1Faces=layer1.singlepart.GetPartFace((24.0,24.0,thickness*0),DM.abqpointtolerance))
+                                  side1Faces=layer1.singlepart.GetPartFace((-49.0,-49.0,thickness*0),0.1))
 
 
 ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa 
@@ -240,7 +241,7 @@ ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa
 # prefix. 
 FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
                         createStepName=ApplyForceStep.name,
-                        region=layer1.singlepart.GetInstanceFaceRegionSurface((24.0,24.0,thickness*0.0),DM.abqpointtolerance),
+                        region=layer1.singlepart.GetInstanceFaceRegionSurface((-49.0,-49.0,thickness*0.0),0.1),
                         distributionType=abqC.UNIFORM,
                         field='',
                         localCsys=None,
