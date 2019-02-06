@@ -10,12 +10,12 @@ import os
 from distutils.core import setup
 
 
-setup(name="delamo2",
+setup(name="delamo",
       description="De-la-mo v2",
       author="Adarsh Krisnamurthy, Stephen D. Holland",
       url="http://thermal.cnde.iastate.edu/de-la-mo.xhtml",
       #ext_modules=[],
-      packages=["delamo2"],
+      packages=["delamo"],
       scripts=["scripts/delamo_process","scripts/delamo_test_processor"],
-      cmdclass = {"build_ext": build_ext_openmp},
+      #cmdclass = {"build_ext": build_ext_openmp},
 )

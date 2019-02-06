@@ -1,25 +1,22 @@
 import numpy as np
 
-import delamo.CADwrap
 from delamo.api import DelamoModeler 
 from delamo.api import Layer
 from delamo.api import bond_layers
 from delamo.api import SimpleCoordSys
 from delamo import process
+from delamo.layer import LayerMold
 
 import os
 
 # Front matter
 # ------------
 
-# Read ACIS license key
-acis_license = delamo.CADwrap.read_license_key(filename="license.dat")
 
 # Initialize the DeLaMo model
 DM=DelamoModeler.Initialize(globals(),
                             pointtolerancefactor=100.0,
-                            normaltolerance=100e-4,
-                            license_key=acis_license)
+                            normaltolerance=100e-4)
 
 # This script then generates both a CAD file and a Python script.
 # The Python script can be run from Abaqus. It includes the 
@@ -79,16 +76,8 @@ LaminateAssemblyMeshing=DM.meshinstrs.rewrapobj(LaminateAssembly)
 # Set layer thickness we are planning on using
 thickness = 0.199
 
-# Create a NURBS mold surface
-# over which the lamina will be laid
-# In this case it is flat
-mold = delamo.CADwrap.NURBSd()
-mold.degree_u = 3
-mold.degree_v = 3
-mold.knotvector_u = [ 0, 0, 0, 0, 1, 2, 3, 3, 3, 3 ]
-mold.knotvector_v = [ 0, 0, 0, 0, 1, 2, 3, 3, 3, 3 ]
-# Read in control points for NURBS surface from a file
-mold.read_ctrlpts("data/CP_Planar1.txt")
+# Load a NURBS mold surface from a file
+Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
 
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,
@@ -99,7 +88,7 @@ coordsys=SimpleCoordSys((1.0,0.0,0.0),(0.0,1.0,0.0))
 
 # Create 1st layer by moving the distance specified by thickness
 # in the OFFSET_DIRECTION
-layer1 = Layer.CreateFromMold(DM,mold,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_1",LaminaSection,0,coordsys=coordsys)
+layer1 = Layer.CreateFromMold(DM,Mold,"OFFSET",thickness,"Layer_1",LaminaSection,0,coordsys=coordsys)
 
 # Once any breaks, etc. of a given layer are complete, it must be
 # finalized. 
@@ -126,11 +115,11 @@ FixedPoint=[-20.0,-25.0,0.1]
 # replay (.rpy) file. 
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 2nd layer
-layer2 = Layer.CreateFromLayer(DM,layer1.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_2", LaminaSection,-45,coordsys=coordsys)
+layer2 = Layer.CreateFromMold(DM,layer1.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_2", LaminaSection,-45,coordsys=coordsys)
 layer2.Finalize(DM)
 layer2.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -142,31 +131,31 @@ bond_layers(DM,layer1, layer2)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer2.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer2.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 3rd layer
-layer3 = Layer.CreateFromLayer(DM,layer2.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_3",LaminaSection,45,coordsys=coordsys)
+layer3 = Layer.CreateFromMold(DM,layer2.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_3",LaminaSection,45,coordsys=coordsys)
 layer3.Finalize(DM)
 layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
 # The line below performs a bonding operation with a delamination
 # and a contact zone inside the delamination surrounded by a
 # cohesive zone into which the delamination may grow
-bond_layers(DM,layer2, layer3, defaultBC=delamo.CADwrap.BC_COHESIVE,
+bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
             CohesiveInteraction=CohesiveInteraction,
             ContactInteraction=ContactInteraction,
-            delaminationlist= [ "data/Delamination1_3D.csv" ])
-
+            #delaminationlist= [ "data/Delamination1_3D.csv" ])
+            )
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 4th layer 
-layer4 = Layer.CreateFromLayer(DM,layer3.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_4",LaminaSection,90,coordsys=coordsys)
+layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_4",LaminaSection,90,coordsys=coordsys)
 layer4.Finalize(DM)
 layer4.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -176,13 +165,13 @@ bond_layers(DM,layer3, layer4)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer4.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer4.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 5th layer over the layer 4 or the stiffener contour, if present
 # ... for we just tell it to follow the layer 4 contour, which
 # the stiffener automagically expanded
-layer5 = Layer.CreateFromLayer(DM,layer4.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_5",LaminaSection,90,coordsys=coordsys)
+layer5 = Layer.CreateFromMold(DM,layer4.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_5",LaminaSection,90,coordsys=coordsys)
 layer5.Finalize(DM)
 layer5.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -192,11 +181,11 @@ bond_layers(DM,layer4, layer5)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer5.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer5.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 6th layer
-layer6 = Layer.CreateFromLayer(DM,layer5.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_6",LaminaSection,45,coordsys=coordsys)
+layer6 = Layer.CreateFromMold(DM,layer5.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_6",LaminaSection,45,coordsys=coordsys)
 layer6.Finalize(DM)
 layer6.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -206,11 +195,11 @@ bond_layers(DM,layer5, layer6)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer6.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer6.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 7th layer
-layer7 = Layer.CreateFromLayer(DM,layer6.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_7",LaminaSection,-45,coordsys=coordsys)
+layer7 = Layer.CreateFromMold(DM,layer6.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_7",LaminaSection,-45,coordsys=coordsys)
 layer7.Finalize(DM)
 layer7.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -220,11 +209,11 @@ bond_layers(DM,layer6, layer7)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer7.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer7.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 
 # Create 8th layer
-layer8 = Layer.CreateFromLayer(DM,layer7.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_8",LaminaSection,0,coordsys=coordsys)
+layer8 = Layer.CreateFromMold(DM,layer7.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_8",LaminaSection,0,coordsys=coordsys)
 layer8.Finalize(DM)
 layer8.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -234,13 +223,13 @@ bond_layers(DM,layer7, layer8)
 FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer8.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+                   region=layer8.singlepart.GetInstanceFaceRegion(FixedPoint,DM.abqpointtolerance))
 
 # Can define a "Surface" that is visible in the Abaqus output database
 # This is a direct ABAQUS call on the part object
 # within layer1 (assumes layer1 is not split due to fiber/matrix breakage)
 layer1.singlepart.fe_part.Surface(name="ForceSurface",
-                                  side1Faces=layer1.singlepart.GetPartFace((24.0,24.0,thickness*0),DM.pointtolerance))
+                                  side1Faces=layer1.singlepart.GetPartFace((24.0,24.0,thickness*0),DM.abqpointtolerance))
 
 
 ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa 
@@ -251,7 +240,7 @@ ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa
 # prefix. 
 FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
                         createStepName=ApplyForceStep.name,
-                        region=layer1.singlepart.GetInstanceFaceRegionSurface((24.0,24.0,thickness*0.0),DM.pointtolerance),
+                        region=layer1.singlepart.GetInstanceFaceRegionSurface((24.0,24.0,thickness*0.0),DM.abqpointtolerance),
                         distributionType=abqC.UNIFORM,
                         field='',
                         localCsys=None,

@@ -28,9 +28,9 @@ except NameError:
 bond_layers_params = [ "DM","layer1","layer2" ]
 if redbaron is not None:
     bond_layers_default_params = OrderedDict([
-        ("defaultBC", redbaron.RedBaron("delamo.CADwrap.BC_TIE")[0]),
-        ("delamBC", redbaron.RedBaron("delamo.CADwrap.BC_CONTACT")[0]),
-        ("delamRingBC", redbaron.RedBaron("delamo.CADwrap.BC_NONE")[0]),
+        ("defaultBC", redbaron.RedBaron("\"TIE\"")[0]),
+        ("delamBC", redbaron.RedBaron("\"CONTACT\"")[0]),
+        ("delamRingBC", redbaron.RedBaron("\"NONE\"")[0]),
         ("CohesiveInteraction", redbaron.NameNode.from_fst({"type":"name","value":"None"})),
         ("ContactInteraction", redbaron.NameNode.from_fst({"type":"name","value":"False"})),
         ("delaminationlist", redbaron.NameNode.from_fst({"type":"name","value":"None"})),

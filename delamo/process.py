@@ -7,8 +7,8 @@ import traceback
 
 from collections import OrderedDict
 
-# This imports so it fails here if stuff is not available
-import delamo.CADwrap
+## This imports so it fails here if stuff is not available
+#import delamo.CADwrap
 
 
 try:
@@ -120,7 +120,7 @@ def output_filenames(basename,phase=None,process=None,nodircheck=False,apply_dam
     
     #cad_file_name=os.path.join(output_directory,"%s_%s.sat" % (basefile,phase))
     script_to_generate=os.path.join(output_directory,"%s_%s_abq.py" % (basefile,phase))
-    cad_file_path_from_script="%s_%s.sat" % (basefile,phase)
+    cad_file_path_from_script="%s_%s.step" % (basefile,phase)
     layer_boundary_template=os.path.join(output_directory,"%s_%s_bnd%%d_line%%d_ver%%d.stl" % (basefile,phase))
 
     return (script_to_generate,cad_file_path_from_script,layer_boundary_template)

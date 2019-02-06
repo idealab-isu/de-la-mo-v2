@@ -24,9 +24,11 @@ from delamo.codegen import namedbinding_wrapper
 
 from delamo.abqscript import write_abq_script
 from delamo.abqscript import _capture_assignments_as_variables
+from delamo.OCCModelBuilder import OCCModelBuilder
+from delamo.layer import Layer as OCCLayer
 
 
-import delamo.CADwrap
+#import delamo.CADwrap
 
 # Abaqus constants that need to be globally
 # accessible can be wrapped by the namedbinding_wrapper
@@ -109,10 +111,10 @@ class DelamoModeler(object):
 
     # Geometry kernel parameters
     modelbuilder=None
-    """delamo.CADwrap.ModelBuilder() object."""
+    """delamo.OCCModelBuilder.OCCModelBuilder() object."""
 
 
-    pointtolerance=None
+    abqpointtolerance=None
     """Default point tolerance for finite element face and edge identification"""
     normaltolerance=None
     """Default normal tolerance for finite element face identification"""
@@ -136,7 +138,7 @@ class DelamoModeler(object):
 
         # Put the CAD layers into a std::vector implementation
         # This  works like a regular Python list due to the appropriate definitions in Swig and C++ code
-        self.to_be_saved=delamo.CADwrap.MBBodyList()
+        self.to_be_saved=[] 
         self.to_be_saved_dependencies=[]
 
         for argname in kwargs:
@@ -230,7 +232,8 @@ class DelamoModeler(object):
     
     @classmethod
     def Initialize(cls,globals,
-                   pointtolerancefactor=100.0,
+                   pointtolerance=1e-7, # Geometry Kernel tolerance (mm)
+                   pointtolerancefactor=100.0, # How much larger the tolerance should be in Abaqus
                    normaltolerance=100e-4,
                    tangenttolerance=100e-4,
                    license_key=""):
@@ -300,14 +303,14 @@ class DelamoModeler(object):
         
         #BodyDB=assemblyinstrs.rewrapobj(BodyDB_build)
             
-        # Initialize the ACIS Model Builder
-        modelbuilder = delamo.CADwrap.ModelBuilder(license_key=license_key)
+        # Initialize the OpenCascade Model Builder
+        modelbuilder = OCCModelBuilder(PointTolerance=pointtolerance,NormalTolerance=normaltolerance)
 
         
         # Define default finite element tolerances
         # facepointtolerance = assemblyinstrs.assign_variable("facepointtolerance", facepointtolerancefactor*modelbuilder.tolerance())  # point positioning tolerance, in abaqus units (mm)g
         # normaltolerance = assemblyinstrs.assign_variable("normaltolerance", normaltolerance)
-        pointtolerance=pointtolerancefactor*modelbuilder.tolerance()
+        abqpointtolerance=pointtolerancefactor*modelbuilder.PointTolerance
             
         DM=cls(initinstrs=initinstrs,
                assemblyinstrs=assemblyinstrs,
@@ -332,7 +335,7 @@ class DelamoModeler(object):
                #BodyDB_build=BodyDB_build,
                #BodyDB=BodyDB,
                modelbuilder=modelbuilder,
-               pointtolerance=pointtolerance,
+               abqpointtolerance=abqpointtolerance,
                normaltolerance=normaltolerance,
                tangenttolerance=tangenttolerance)
         
@@ -381,13 +384,12 @@ class DelamoModeler(object):
         #    pass
         
         
-        BodyNameList=delamo.CADwrap.StringList()
-        empty_oldstyle_layerlist=delamo.CADwrap.LayerList()
+        BodyNameList=[] 
 
         script_directory=os.path.split(script_to_generate)[0]
         cad_file_name=os.path.join(script_directory,cad_file_path_from_script)
         
-        self.modelbuilder.save(cad_file_name, empty_oldstyle_layerlist, self.to_be_saved,BodyNameList)
+        BodyNameList = self.modelbuilder.save(cad_file_name, self.to_be_saved)
         #self.modelbuilder.save(cad_file_name, layer_list, BodyNameList)
         # BodyNameList now contains a list of body names, ordered the same as the body numbers in the .sat file
 
@@ -454,7 +456,7 @@ class Part(object):
     fe_materialorientation=None
     """Abaqus material orientation"""
 
-    gk_part=None
+    gk_layerbody=None
     """Geometry kernel representation of this part"""
     
     def __init__(self,**kwargs):
@@ -497,9 +499,9 @@ class Part(object):
             type=abqC.DEFORMABLE_BODY)
         
         newpart = cls(DM=DM,
-                      name=name,fe_part=fe_part,gk_part=gk_part)
+                      name=name,fe_part=fe_part,gk_layerbody=gk_layerbody)
 
-        DM.to_be_saved.append(gk_part)
+        DM.to_be_saved.append(gk_layerbody)
         # Create instance of new part
         newpart.CreateInstance(dependent=abqC.ON)
         
@@ -507,7 +509,7 @@ class Part(object):
     
 
     @classmethod
-    def FromGK3D(cls,DM,gk_part,shell=False,no_FE_instance=False,omit_from_FE=False):
+    def FromGK3D(cls,DM,gk_layerbody,shell=False,no_FE_instance=False,omit_from_FE=False):
         """Define a solid or shell part from a 3D geometry kernel object. Ensures that 
         this geometry kernel object will be saved to the generated CAD file
         and programs ABAQUS to load it in and create an instance. """
@@ -518,9 +520,9 @@ class Part(object):
         if not omit_from_FE:
             geom_fh=DM.abq_assembly.mdb.openAcis(DM.acisfile,scaleFromFile=abqC.ON)
             fe_part=DM.FEModel.PartFromGeometryFile(
-                name=gk_part.name(),
+                name=gk_layerbody.Name,
                 geometryFile=geom_fh,
-                bodyNum=DM.BodyNumDB[gk_part.name()], #M.globals["LookupBodies"](M.BodyNumDB,bodyname),
+                bodyNum=DM.BodyNumDB[gk_layerbody.Name], #M.globals["LookupBodies"](M.BodyNumDB,bodyname),
                 combine=False,
                 dimensionality=abqC.THREE_D,
                 type=abqC.DEFORMABLE_BODY)
@@ -530,10 +532,10 @@ class Part(object):
             pass
 
         newpart = cls(DM=DM,
-                      name=gk_part.name(),fe_part=fe_part,gk_part=gk_part,shell=shell)
+                      name=gk_layerbody.Name,fe_part=fe_part,gk_layerbody=gk_layerbody,shell=shell)
 
         if not omit_from_FE:
-            DM.to_be_saved.append(gk_part)
+            DM.to_be_saved.append(gk_layerbody)
 
             # Create instance of new part
             if not no_FE_instance:
@@ -1066,7 +1068,8 @@ layup direction, etc."""
         # e.g. mold, thickness, or layer, direction, thickness
 
         # ***!!!! Should this still be a layer object or a more generic part object???
-        gk_layer=delamo.CADwrap.Layer()
+        # ***!!!!!  OBSOLETE... NEEDS AN UPDATE 
+        gk_layer=OCCLayer()
 
         actual_create_params=list(create_params)
         actual_create_params.append(gk_layer)
@@ -1092,15 +1095,15 @@ layup direction, etc."""
             self.coordsys=SimpleCoordSys((1.0,0.0,0.0),(0.0,1.0,0.0))
             pass
         
-        for gk_part in self.gk_layer:
+        for gk_layerbody in self.gk_layer.BodyList:
 
-            part=LayerPart.FromGK3D(DM,gk_part)  # This also adds it to to_be_saved
+            part=LayerPart.FromGK3D(DM,gk_layerbody)  # This also adds it to to_be_saved
 
             #part.CreateInstance(dependent=abqC.ON)
             
             part.ApplyLayup(self.coordsys,self.layupdirection)
             part.AssignSection(self.LayerSection)
-            self.parts[gk_part.name()]=part
+            self.parts[gk_layerbody.Name]=part
             
             DM.to_be_saved_dependencies.append(self.gk_layer) # prevent the gk_layer from being destroyed 
             
@@ -1114,38 +1117,18 @@ layup direction, etc."""
     @classmethod
     def CreateFromMold(cls,DM,mold,direction,thickness,name,Section,layup,coordsys=None):
         """Create a layer atop the specified mold. 
- * direction: delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION
+ * direction: "OFFSET" or "ORIG"
  * thickness: Thickness of layer (offsetting operation)
  * name: Unique name for layer
  * Section: ABAQUS section fo the layer
  * layup: Ply orientation in degrees
  * coordsys: Reference coordinate system for layup"""
-        
-        return cls.CreateFromParams(DM,(mold,direction,thickness),name,Section,layup,coordsys=coordsys)
 
-    @classmethod
-    def CreateFromLayer(cls,DM,priorlayer,direction,thickness,name,Section,layup,coordsys=None):
-        """Create a layer atop the specified prior layer.  
- * direction: delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION
- * thickness: Thickness of layer (offsetting operation)
- * name: Unique name for layer
- * Section: ABAQUS section fo the layer
- * layup: Ply orientation in degrees
- * coordsys: Reference coordinate system for layup"""
-        return cls.CreateFromParams(DM,(priorlayer,direction,thickness),name,Section,layup,coordsys=coordsys)
-    
-    @classmethod
-    def CreateFromSAT(cls,DM,sat_filename,direction,thickness,name,Section,layup,coordsys=None):
-        """Create a layer using a CAD surface as a mold, loaded from a .SAT file.  
- * direction: delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION
- * thickness: Thickness of layer (offsetting operation)
- * name: Unique name for layer
- * Section: ABAQUS section fo the layer
- * layup: Ply orientation in degrees
- * coordsys: Reference coordinate system for layup"""
-        lm_list = delamo.CADwrap.LayerMoldList()
-        DM.modelbuilder.load_molds(sat_filename, lm_list)
-        return cls.CreateFromParams(DM,(lm_list[0],direction,thickness),name,Section,layup,coordsys=coordsys)
+        gk_layer=OCCLayer.CreateFromMold(name,mold,thickness,direction,DM.modelbuilder.PointTolerance)
+        
+        return cls(name=name,gk_layer=gk_layer,layupdirection=layup,LayerSection=Section,coordsys=coordsys)
+
+
     
     @classmethod
     def CreateSplitLayer(cls,DM,priorlayer,direction,thickness,name,Section,layup,filename,coordsys=None):
@@ -1156,6 +1139,7 @@ layup direction, etc."""
  * Section: ABAQUS section fo the layer
  * layup: Ply orientation in degrees
  * coordsys: Reference coordinate system for layup"""
+        # ***!!!! OBSOLETE -- NEEDS REWORK
         # Read doxygen-generated documentation for ModelBuilder class for details...
         return cls.CreateFromParams(DM, (priorlayer, direction, thickness), name, Section, layup, filename,coordsys=coordsys)
 
@@ -1167,6 +1151,7 @@ layup direction, etc."""
  * stiffnerfilename: File with cross section of the stiffener."""
         gk_layer=delamo.CADwrap.Layer()
 
+        # ***!!!! OBSOLETE -- NEEDS UPDATE
         DM.modelbuilder.create_hat_stiffener(priorlayer,gk_layer,stiffenerfilename)
 
         gk_layer.name(name)
@@ -1452,6 +1437,8 @@ def shell_and_cutout_from_shelltool(DM,shelltool_filename):
     returns a Part reprepresenting the shell with hole, a second Part representing the 
     cut-out, and a list of (point,tangent) tuples for identifying the edges around 
     the hole (useful for mesh refinement)"""
+
+    # ***!!!! Needs update
     layer_mold_list=delamo.CADwrap.LayerMoldList()
     DM.modelbuilder.create_shell_cutout(shelltool_filename,layer_mold_list)
 
@@ -1504,6 +1491,8 @@ class shell_solid_coupling(object):
     def bond_layer(self,DM,layer,layeroffset):
         """Bond a layer to the shell"""
         # Apply layeroffset to get the layer boundary location
+
+        # ***!!! Needs rework ***!!!
         LayerEdgePointList=delamo.CADwrap.TPoint3dList()
         DM.modelbuilder.translate_shell_edge_points(self.shell_edge_point_list,self.shell_edge_normal_list,layeroffset,LayerEdgePointList)
         
@@ -1571,6 +1560,8 @@ class shell_solid_coupling(object):
     @classmethod
     def from_shell_and_cutout(cls,DM,shell,cutout):
         """Create shell_solid_coupling object from a shell and cutout, for example as returned by shell_and_cutout_from_shelltool()"""
+
+        # ***!!! NEEDS UPDATE
         shell_edge_point_list = delamo.CADwrap.TPoint3dList()
         shell_edge_tangent_list = delamo.CADwrap.TPoint3dList()
         shell_edge_normal_list = delamo.CADwrap.TPoint3dList()
@@ -1597,87 +1588,12 @@ class shell_solid_coupling(object):
         return ssc
     pass
         
-def bond_shell_layer_OBSOLETE(DM,shell,cutout,layer,layeroffset,influenceDistance=None,positionTolerance=None):
-    # Get the edge point, tangent, and normal lists from iterating around the hole in the shell
-    # !!!*** Where does the sign of layeroffset come from??? 
-    
-    shell_edge_point_list = delamo.CADwrap.TPoint3dList()
-    shell_edge_tangent_list = delamo.CADwrap.TPoint3dList()
-    shell_edge_normal_list = delamo.CADwrap.TPoint3dList()
-    
-    # Note:  load_shell_model() is horribly misnamed. It iterates around the hole in the shell, filling out the edge point, tangent, and normal lists
-    # NOTE: It will eventually need a cutout parameter to distinguish which hole in the shell to iterate over. 
-    DM.modelbuilder.load_shell_model(shell.gk_part, shell_edge_point_list, shell_edge_tangent_list, shell_edge_normal_list)
-
-
-    # Apply layeroffset to get the layer boundary location
-    LayerEdgePointList=delamo.CADwrap.TPoint3dList()
-    DM.modelbuilder.translate_shell_edge_points(shell_edge_point_list,shell_edge_normal_list,layeroffset,LayerEdgePointList);
-
-    layerSideFacePointList = delamo.CADwrap.TPoint3dList()
-    layerSideFaceNormalList = delamo.CADwrap.TPoint3dList()
-    DM.modelbuilder.find_side_faces(layer.gk_layer,LayerEdgePointList,layerSideFacePointList,layerSideFaceNormalList)
-
-    # ***!!! IMPORTANT: Should be able to deal with with a shell section 
-    # that is offset from the shell geometry, for example if the shell geometry
-    # represents the outer surface
-    
-    # Should also be able to shift mold inwards or to lay up both atop and underneath
-
-    
-    # Investigate explicit specification of position tolerance as well as influence distance
-    #GetFacesBC = DM.bcinstrs.rewrapobj(DM.GetFaces)
-    #LaminateBC = DM.bcinstrs.rewrapobj(Laminate)
-    #GetEdgesBC = DM.bcinstrs.rewrapobj(DM.GetEdges)
-    #felayer1bc = DM.bcinstrs.rewrapobj(layer1.fe_layer)
-    
-    for edgecnt in range(len(LayerEdgePointList)):
-        solidface=DM.globals["GetFace_point_normal"](layer.singlepart.fe_inst.faces,(layerSideFacePointList[edgecnt],layerSideFaceNormalList[edgecnt]),DM.pointtolerance,DM.normaltolerance)
-        SolidFaceRegion=DM.regionToolset.Region(side1Faces=solidface)
-        #SolidSurf=Laminate.Surface(name="SolidSurf",side1Faces=solidfaces)
-
-        #ShellGeomPartBC=DM.bcinstrs.rewrapobj(ShellGeomPart)
-        # Either need to modify edge algorithm or get tangent...
-        shelledge=DM.globals["GetEdge_point_tangent"](shell.fe_inst.edges,shell.fe_part.vertices,(tuple(shell_edge_point_list[edgecnt]),shell_edge_tangent_list[edgecnt]),0.1,DM.normaltolerance)
-        ShellRegion=DM.regionToolset.Region(side1Edges=shelledge)
-
-        #ShellSurf=Laminate.Surface(name="ShellSurf",side1Edges=shelledges)
-        ssc_params={
-            "name": 'ssc%d-%d' % (DM.get_unique(),edgecnt),
-            "shellEdge": ShellRegion,
-            "solidFace": SolidFaceRegion,
-            "positionToleranceMethod": abqC.COMPUTED,
-            "influenceDistanceMethod": abqC.DEFAULT
-            }
-        
-        #DM.FEModel.ShellSolidCoupling(name='ssc%d-%d' % (DM.get_unique(),edgecnt),
-        #                              shellEdge=ShellRegion,
-        #                              solidFace=SolidFaceRegion,
-        #                              positionToleranceMethod=abqC.COMPUTED,
-        #                              influenceDistanceMethod=abqC.DEFAULT)
-
-        if influenceDistance is not None:
-            ssc_params["influenceDistanceMethod"]=abqC.SPECIFIED
-            ssc_params["influenceDistance"]=influenceDistance
-            pass
-
-        if positionTolerance is not None:
-            ssc_params["positionToleranceMethod"]=abqC.SPECIFIED
-            ssc_params["positionTolerance"]=positionTolerance
-            pass
-        DM.FEModel.ShellSolidCoupling(**ssc_params)
-        pass
-    pass
-
-    
-    pass
-    
 # !!!*** the parameters of the bond_layers() call must be kept in sync
 # with the bond_layers_params and bond_layers_default_params
 # variables in processor.py
 # *** ALSO NEED TO CHANGE CODE in processor.py/annotate_bond_layers_calls
 # *** WHERE "basename" and "phase" parameters
-def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.CADwrap.BC_CONTACT,delamRingBC=delamo.CADwrap.BC_NONE,CohesiveInteraction=None,ContactInteraction=None,delaminationlist=None,master_layer=None,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None):
+def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="NONE",CohesiveInteraction=None,ContactInteraction=None,delaminationlist=None,master_layer=None,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None):
     """Bond two layers together. Parameters:
 * DM: DelamoModeler object
 * layer1: First layer
@@ -1696,18 +1612,13 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
 """
     # *** Should we be able to specify how fine the .stl mesh should be? ***!!!
 
-    gk_delaminationlist = delamo.CADwrap.StringList()
-
-    if delaminationlist is not None:
-        for delamfilename in delaminationlist:
-            gk_delaminationlist.add(delamfilename)
-            pass
-        pass
     
     
-    if defaultBC==delamo.CADwrap.BC_COHESIVE_LAYER:
-        # This is really two bonding operationss one between layer1 and cohesive_layer,
+    if defaultBC=="COHESIVE_LAYER":
+        # This is really two bonding operations one between layer1 and cohesive_layer,
         # and one between layer2 and cohesive_layer
+
+        # ***!!!! This part NEEDS UPDATE
         
         if cohesive_layer is None:
             raise ValueError("When bonding layers with a cohesive layer, you must have explicitly created the cohesive layer and passed it as the cohesive_layer parameter")
@@ -1759,14 +1670,19 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
     #face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,defaultBC) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
     #    pass
     #else:
-        
-    face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,gk_delaminationlist,defaultBC,delamBC,delamRingBC) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
-    #    pass
+
+    if delaminationlist is not None:
+        DM.modelbuilder.apply_delaminations(layer1.gk_layer,layer2.gk_layer,delaminationlist)
+        pass
+    
+
+    face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,defaultBC,bc_map={ "CONTACT": delamBC, "NONE": delamRingBC })
+    
 
     # Can not bond non-existant objects
     ThisContact = LaminaContact(DM=DM,bottomlamina=layer1, toplamina=layer2)
     
-    print("Face adjacency: Layer %s and Layer %s:" % (layer1.gk_layer.name(),layer2.gk_layer.name()))
+    print("Face adjacency: Layer %s and Layer %s:" % (layer1.gk_layer.Name,layer2.gk_layer.Name))
     
     for face_adjacency in face_adjacency_list:
         # NOTE: We only use point1, vector1 because
@@ -1785,7 +1701,7 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
             master_part=None
             pass
         
-        if face_adjacency['bcType'] == delamo.CADwrap.Delamination_COHESIVE:
+        if face_adjacency['bcType'] == "COHESIVE":
             print("    Cohesive, Body %s to %s" %(face_adjacency['name1'],face_adjacency['name2']))
             assert(CohesiveInteraction is not None) # Must provide CohesiveInteraction parameter if such interaction is found between the two surfaces
             ThisContact.DefineLamination(DM.FEModel,
@@ -1794,13 +1710,13 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
                                          layer2.parts[face_adjacency['name2']],
                                          (face_adjacency['point1'],
                                           face_adjacency['normal1']),
-                                         DM.pointtolerance,
+                                         DM.abqpointtolerance,
                                          DM.normaltolerance,
                                          master=master_part)
             
             pass
         
-        elif face_adjacency['bcType'] == delamo.CADwrap.Delamination_CONTACT:
+        elif face_adjacency['bcType'] == "CONTACT":
             print("    Contact, Body %s to %s" %(face_adjacency['name1'],face_adjacency['name2']))
             # Must provide CohesiveInteraction parameter if such interaction is found between the two surfaces
             assert(ContactInteraction is not None)
@@ -1810,11 +1726,11 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
                                            layer2.parts[face_adjacency['name2']],
                                            (face_adjacency['point1'],
                                             face_adjacency['normal1']),
-                                           DM.pointtolerance,
+                                           DM.abqpointtolerance,
                                            DM.normaltolerance,
                                            master=master_part)
             pass
-        elif face_adjacency['bcType'] == delamo.CADwrap.Delamination_TIE:
+        elif face_adjacency['bcType'] == "TIE":
             print("    Tie, Body %s to %s" %(face_adjacency['name1'],face_adjacency['name2']))
             
             ThisContact.DefineContinuity(DM.FEModel,
@@ -1822,12 +1738,12 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
                                          layer2.parts[face_adjacency['name2']],
                                          (face_adjacency['point1'],
                                            face_adjacency['normal1']),
-                                         DM.pointtolerance,
+                                         DM.abqpointtolerance,
                                          DM.normaltolerance,
                                          master=master_part)
             pass
         
-        elif face_adjacency['bcType'] == delamo.CADwrap.Delamination_NOMODEL:
+        elif face_adjacency['bcType'] == "NOMODEL":
             print("    Nomodel, Body %s to %s" %(face_adjacency['name1'],face_adjacency['name2']))
             pass
         else:
@@ -1844,109 +1760,9 @@ def bond_layers(DM,layer1,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamo.
             DM.modelbuilder.save_layer_surface_stl(delamo_fname,layer1.gk_layer,layer2.gk_layer)
             pass
         
-
+        
         pass
 
     pass
     
-
-
-def FixedFace_OBSOLETE(self,M,assembly,Step,Faces,name=None): # Faces identified by list of (body, (point,normal))
-    cnt=0
-    retlist=[]
-    for (FaceBodyName,FacePointsNormals) in Faces:
-        if name is not None:
-            BCName="%s_%d" % (name,cnt)
-            pass
-        else:
-            BCName="FixedFaceBC_%d" % (M.get_unique())
-            pass
-        retlist.append(M.FEModel.EncastreBC(name="%s_%d" % (BCname,MD.get_unique()),
-                                            createStepName=Step.name,
-                                            region=regionToolset.Region(faces=BCFaces(part,FaceBodyName,FacePointsNormals,pointtolerance,normaltolerance))))
-        
-        
-        cnt+=1
-        pass
-    return retlist
-
-def Pressure_OBSOLETE(self,M,Step,Faces,pressure_magnitude,name=None): # Faces identified by list of (body, points, normals)
-    #### Need to update like FixedFace()
-    cnt=0
-    retlist=[]
-    for (FaceBodyName,FacePointsNormals) in Faces:
-        if name is not None:
-            BCName="%s_%d" % (name,cnt)
-            pass
-        else:
-            BCName="PressureBC_%d" % (FE_params.get_unique())
-            pass
-        retlist.append(M.BoundaryCondition.Pressure(M.FEModel,self.fe_layer,BCName,DLO_Params.BodyNumDB[FaceBodyName],
-                                                    pressure_magnitude,
-                                                    Step,
-                                                    FacePointsNormals,
-                                                    M.facepointtolerance,
-                                                    M.normaltolerance))
-        
-        
-        cnt+=1
-        pass
-    
-    
-    return retlist
-
-def SurfaceTraction_OBSOLETE(self,M,Step,Faces,vector,name=None): # Faces identified by list of (body, points, normals)
-    #### Need to update like FixedFace()
-    cnt=0
-    retlist=[]
-    for (FaceBodyName,FacePointsNormals) in Faces:
-        if name is not None:
-            BCName="%s_%d" % (name,cnt)
-            pass
-        else:
-            BCName="SurfaceTractionBC_%d" % (FE_params.get_unique())
-            pass
-        retlist.append(M.BoundaryCondition.SurfaceTraction(M.FEModel,self.fe_layer,BCName,M.BodyNumDB[FaceBodyName],
-                                                           vector,
-                                                           Step,
-                                                           FacePointsNormals,
-                                                           M.facepointtolerance,
-                                                           M.normaltolerance))
-        
-        
-        cnt+=1
-        pass
-    return retlist
-
-
-def PrescribedDisplacement_OBSOLETE(self,M,Step,Faces,**kwargs): # kwrags are u1,u2,u3, ur1,ur2,ur3, name=None): # Faces identified by list of (body, points, normals)
-    #### Need to update like FixedFace()
-    name=None
-    
-    if "name" in kwargs:
-        name=kwargs["name"]
-        del kwargs["name"]
-        pass
-    
-    cnt=0
-    retlist=[]
-    for (FaceBodyName,FacePointsNormals) in Faces:
-        if name is not None:
-            BCName="%s_%d" % (name,cnt)
-            pass
-        else:
-            BCName="PrescribedDisplacementBC_%d" % (FE_params.get_unique())
-            pass
-        retlist.append(M.BoundaryCondition.PrescribedDisplacementFace(M.FEModel,self.fe_layer,BCName,M.BodyNumDB[FaceBodyName],
-                                                                      Step,
-                                                                      FacePointsNormals,
-                                                                      M.facepointtolerance,
-                                                                      M.normaltolerance,**kwargs))
-        
-        
-        cnt+=1
-        pass
-    return retlist
-
-
 

@@ -171,7 +171,7 @@ class OCCModelBuilder(object):
             pass
         pass
     
-    def adjacent_layers(self,layer1,layer2,defaultbc):
+    def adjacent_layers(self,layer1,layer2,defaultbc,bc_map=None):
         """ Once adjacent_layers() is called, the LayerBody's in EITHER layer can't be split
         anymore -- because then they might need new names,
         and the return values contain the layer body names that will be used
@@ -180,15 +180,21 @@ class OCCModelBuilder(object):
         FAL = [] # Face Adjacency List
         
         for lb1 in layer1.BodyList:
-            for lb2 in layer1.BodyList:
+            for lb2 in layer2.BodyList:
                 FacePairs=self.eval_face_pairs(lb1,lb2)
                 for postimprint_CommonFace in FacePairs:
                     BCType=postimprint_CommonFace.BCType
 
+                    assert(lb1.Name is not None)
+                    assert(lb2.Name is not None)
+                    
                     if BCType is None: # BCType not otherwise set... insert default
                         BCType=defaultbc
                         pass
-                    
+                    elif bc_map is not None:
+                        # apply user-supplied BC mapping
+                        BCType=bc_map[BCType]
+                        pass
                     FAL.append( { "name1": lb1.Name,
                                   "name2": lb2.Name,
                                   "bcType": BCType,
@@ -203,7 +209,32 @@ class OCCModelBuilder(object):
             
             pass
         
-        return FAL                    
+        return FAL
+
+
+    def save(self,cad_file_name,to_be_saved):
+        step_writer=STEPControl_Writer()
+        BodyNameList=[]
+        BodyNameSet=set([])
+
+        #for layerobj in to_be_saved:
+        #    for layerbodyobj in layerobj.BodyList:
+                
+        for layerbodyobj in to_be_saved:
+            step_writer.Transfer(layerbodyobj.Shape,STEPControl_ManifoldSolidBrep,True)
+            
+            assert(not(layerbodyobj.Name in BodyNameSet)) # verify nome layerbodyname reuse!
+            
+            BodyNameList.append(layerbodyobj.Name)
+            
+            BodyNameSet.add(layerbodyobj.Name)
+            
+            pass
+        
+        step_writer.Write(cad_file_name)
+        
+        
+        return BodyNameList
     
     pass
 

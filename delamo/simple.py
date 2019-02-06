@@ -1,4 +1,4 @@
-import delamo.CADwrap
+#import delamo.CADwrap
 from delamo.api import DelamoModeler 
 from delamo.api import Layer
 from delamo.api import bond_layers

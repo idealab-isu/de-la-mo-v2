@@ -1,7 +1,7 @@
 import traceback
 import inspect
 import sys
-
+import numpy as np
 
 if sys.hexversion >= 0x03000000: # python 3.x
     # python 3 doesn't have long or unicode
@@ -551,6 +551,8 @@ class codestore(object):
             return repr(obj)
         if isinstance(obj,str) or isinstance(obj,unicode):
             return repr(obj)
+        if isinstance(obj,np.ndarray):
+            return "np.array(%s,dtype=np.%s)" % (np.array2string(obj,separator=',',suppress_small=False,threshold=np.inf,floatmode='unique'),repr(obj.dtype))
 
         
         ## is this one of our wrapped classes...
