@@ -123,6 +123,8 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
                     break
                 pass
 
+            raise ValueError("Point inside face not found!")
+
             pass
 
         pass
