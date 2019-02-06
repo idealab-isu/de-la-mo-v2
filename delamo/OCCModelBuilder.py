@@ -117,7 +117,7 @@ class OCCModelBuilder(object):
 
         return CommonFaces
 
-    def process_delamination(self,layerbody1,facebody1,layerbody2,facebody2,delam_outline):
+    def process_delamination(self,layerbody1,layerbodyface1,layerbody2,layerbodyface2,delam_outline):
         """Given a first layerbody and corresponding face, and a second 
         layerbody and corresponding face, and a delamination outline 
         (loop of 3D coordinates, hopefully projected onto the faces): 
@@ -140,7 +140,118 @@ class OCCModelBuilder(object):
         # NOTE: When regenerating layerbodies, do NOT give them new names unless they are being
         # split (which they aren't from this function)
 
+        # ***!!! Temporarily load curve rather than constructing wire from delamination outline
+        Wire = loaders.load_byfilename(os.path.join("..","Delam1.STEP"))
 
+        exp=TopExp_Explorer(Wire,TopAbs_EDGE)
+        
+        # Iterate over all edges
+        edge_shapes=[]
+        while exp.More():
+            edge_shapes.append(exp.Current())
+            
+            exp.Next()
+            pass
+
+        edge_edges = [ topods_Edge(edge_shape) for edge_shape in edge_shapes ]
+
+        edge_curves = [ BRep_Tool.Curve(edge) for edge in edge_edges ]
+
+
+        # layerbodyface1
+
+        layerbodysurface1 = BRep_Tool.Surface(layerbodyface1.Face)
+
+        # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
+        Projections = [ GeomProjLib.geomprojlib_Project(edge_curve[0],layerbodysurface1) for edge_curve in edge_curves ]
+
+        # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
+        # But it's probably OK not to, because we are using the projection to make a tool that will be used to cut the face
+        # and the extension of the tool beyond the face boundary shouldn't cause any problems, at least so long as thath
+        # geometry doesn't get too weird
+        
+        ProjectionEdges=[ BRepBuilderAPI.BRepBuilderAPI_MakeEdge(Projection).Edge() for Projection in Projections ]
+
+        # If we did trimmming, we would need to construct wire from the edge(s) that actually projected to something within the face,
+        # with any gaps filled by appropriately trimmed edges from the face.
+
+        #ProjectedWireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+        #
+        #for ProjectionEdge in ProjectionEdges:
+        #    ProjectedWireBuilder.add(ProjectionEdge)
+        #    pass
+        #
+        # ProjectedWire = ProjectedWireBuilder.Wire()
+
+
+        # Generate faces connecting original and projected edges.
+        # We will use this as a tool to do the cut. 
+
+        # For the moment assume only one edge
+        
+        build=BRep_Builder()
+        Perimeter=TopoDS_Compound()
+        build.MakeCompound(Perimeter)
+        
+        origwire = TopoDS_Wire()
+        build.MakeWire(origwire)
+        projwire = TopoDS_Wire()
+        build.MakeWire(projwire)
+        
+        for edgecnt in range(len(edge_edges)):
+            edge=edge_edges[edgecnt]
+            projectededge = ProjectedEdges[edgecnt]
+            
+            
+            build.Add(origwire,edge)
+            build.Add(projwire,projectededge)
+            pass
+
+        # Generate side faces
+        SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
+        SideGenerator.AddWire(origwire)
+        SideGenerator.AddWire(projwire)
+        SideGenerator.Build()
+        
+        if (not SideGenerator.IsDone()):
+            raise ValueError("Side face generation failed\n")
+        
+        SideShape = SideGenerator.Shape()
+        
+        build.Add(Perimeter,SideShape)
+        
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Write("/tmp/outersurf.STEP")
+
+        
+        GASplitter=GEOMAlgo_Splitter()
+        GASplitter.AddArgument(layerbodyface1.Face)
+        GASplitter.AddTool(SideShape)
+        GASplitter.Perform()
+        Splitted = GASplitter.Shape()
+        # Hopefully this did not damage layerbodyface1
+        
+        #step_writer3=STEPControl_Writer()
+        #step_writer3.Transfer(Splitted,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer3.Write("/tmp/splitted.STEP")
+
+        splitted_exp=TopExp_Explorer(Splitted,TopAbs_FACE)
+        # Iterate over all faces
+        splitted_face_shapes=[]
+        while splitted_exp.More():
+            splitted_face_shapes.append(splitted_exp.Current())
+    
+            splitted_exp.Next()
+            pass
+
+        # splitted_face_shapes now should have two or more faces (TopoDS_Shape of type Face
+        # Need to create a new layerbody with the original layerbodyfaces except for this one, and two new layerbodyfaces
+
+        # Also need to repeat the process for the other face
+
+        # (so actual content of this function should be abstracted into
+        # a new function we can call twice). 
 
 
 
