@@ -321,7 +321,8 @@ class Layer(object):
                       RefMold=Mold)
 
 
-        NewLayerBody = LayerBody(Owner=NewLayer,
+        NewLayerBody = LayerBody(Name="%s_LB1" % (Name),
+                                 Owner=NewLayer,
                                  Shape=solidShape)
 
         # Extract faces and sort them into NewLayerBody.FaceListOrig, NewLayerBody.FaceListOffset, and NewLayerBody.FaceListSide

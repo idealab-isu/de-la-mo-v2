@@ -1,0 +1,268 @@
+#! /usr/bin/env python
+
+import sys
+import os
+import os.path
+import copy
+import subprocess
+import platform
+import glob
+
+if len(sys.argv) < 2:
+    print("Usage:   %s <original_script_name.py>" % (sys.argv[0]))
+    sys.exit(0)
+    pass
+
+
+original_script_name=sys.argv[1]
+
+# find script directory
+class test(object):
+    pass
+scriptdir=os.path.abspath(os.path.split(sys.modules[test.__module__].__file__)[0])
+
+# If this is from a de-la-mo source tree or install,
+# automatically add to Python path
+newenviron=copy.deepcopy(os.environ)
+
+if os.path.split(scriptdir)[1]=="scripts":
+    installdir=os.path.split(scriptdir)[0]
+    if os.path.exists(os.path.join(installdir,"delamo")):
+        sys.path.insert(0,installdir)
+        if "PYTHONPATH" in newenviron:
+            oldpath=newenviron["PYTHONPATH"]
+            if platform.system=="Windows":
+                newenviron["PYTHONPATH"]=installdir+";"+oldpath
+                pass            
+            else:
+                newenviron["PYTHONPATH"]=installdir+":"+oldpath
+                pass
+            pass
+        else:
+            newenviron["PYTHONPATH"]=installdir
+            pass
+        pass
+
+    if platform.system=="Windows":
+        print("  set PYTHONPATH=\"%s\"" % (newenviron["PYTHONPATH"]))
+        pass
+    else:
+        print("  export PYTHONPATH=\"%s\"" % (newenviron["PYTHONPATH"]))
+        pass
+    pass
+
+
+from delamo import process
+from delamo import processor
+
+
+
+(process_name,process_phases) = process.get_process_phases(original_script_name)
+
+phase_names = [ phase[0] for phase in process_phases ]
+
+
+while True:
+
+    require_scripts = [ not("DELAMO_SCRIPT" in paramdict) or paramdict["DELAMO_SCRIPT"]==True  for (phase_name,gen_code,paramdict) in process_phases ]
+    gen_statuses = [ process.gen_status(original_script_name,phase_names[stepnum],require_scripts[stepnum]) for stepnum in range(len(process_phases)) ]
+
+    bm_statuses = [ process.buildmodel_status(original_script_name,phase_names[stepnum],process_name,require_scripts[stepnum]) for stepnum in range(len(process_phases)) ]
+    
+    print("")
+    
+    print("Process = %s" % (process_name))
+    print("")
+    print("Process phases             GEN                BUILDMODEL")
+    print("-----------------------------------------------------------------")
+    
+    for phasecnt in range(len(process_phases)):
+        print("%2d: %12s  %19s   %19s" % (phasecnt+1,phase_names[phasecnt],gen_statuses[phasecnt],bm_statuses[phasecnt]))
+        pass
+    print("-----------------------------------------------------------------")
+    print("")
+    
+    print(" Commands are: GEN <phase>  (Generate builder script)\n"+
+          "               BM <phase>  (Run builder script to build model)\n"+
+          "               BMINTERACT <phase>  (Run builder script interactively)\n"+
+          "               FEBATCH <phase> (Execute finite element script; script must\n"+
+          "                               run its job to be useful) \n"+
+          "               FEINTERACT <phase> (Execute finite element script interactively)\n"+
+          "               QUIT\n")
+    fullcommand = raw_input(" Enter command --> ")
+
+    print("")
+    
+    command_phase = fullcommand.split()
+    if len(command_phase) != 2:
+        if len(command_phase)==1 and command_phase[0].upper()=="QUIT":
+            sys.exit(0)
+            pass
+        print("Syntax error in command")
+        continue
+    (command,phase) = command_phase
+
+    if phase.isdigit():
+        phasenum = int(phase)-1
+        pass
+    elif phase.upper() in phase_names:
+        phasenum = phase_names.index(phase.upper())
+        pass
+    else:
+        print("Unknown phase %s" % (phase))
+        continue
+    
+    DELAMO_SCRIPT=True
+    if len(process_phases[phasenum]) >= 3 and "DELAMO_SCRIPT" in process_phases[phasenum][2]:
+        DELAMO_SCRIPT=process_phases[phasenum][2]["DELAMO_SCRIPT"]
+        pass
+
+    
+    if command.upper() == "GENERATE" or command.upper()=="GEN":
+        if len(process_phases[phasenum]) < 2 and phasenum==0:
+            print("Error: Phase %s must be manually generated" % (phase_names[phasenum]))
+            continue
+        if len(process_phases[phasenum]) < 2:
+            print("Error: Phase %s has no GENERATE method" % (phase_names[phasenum]))
+            continue
+
+        if phasenum < 1:
+            print("Error: Cannot GENERATE first phase (just BUILDMODEL)")
+            continue
+        
+
+        generate_method = process_phases[phasenum][1]
+
+        # Find previous_DELAMO_SCRIPT_phasenum which is the prior phasenum that has DELAMO_SCRIPT==True
+        previous_DELAMO_SCRIPT_phasenum=phasenum
+        previous_DELAMO_SCRIPT=False
+        while not previous_DELAMO_SCRIPT:
+            previous_DELAMO_SCRIPT_phasenum -= 1
+            previous_DELAMO_SCRIPT=True
+            if len(process_phases[previous_DELAMO_SCRIPT_phasenum]) >= 3 and "DELAMO_SCRIPT" in process_phases[previous_DELAMO_SCRIPT_phasenum][2]:
+                previous_DELAMO_SCRIPT=process_phases[previous_DELAMO_SCRIPT_phasenum][2]["DELAMO_SCRIPT"]
+                pass
+            pass
+
+        
+        (prevphase_dir,prevphase_script)=process.generate_scriptname_for_phase(original_script_name,phase_names[previous_DELAMO_SCRIPT_phasenum])
+        prevphase_tree=processor.tree_from_file(prevphase_script)
+
+        if DELAMO_SCRIPT:
+            (thisphase_dir,thisphase_script)=process.generate_scriptname_for_phase(original_script_name,phase_names[phasenum])
+
+            # update phase parameter to process.output_filenames()
+            process.update_phase(prevphase_tree,prevphase_script,phase_names[phasenum])
+            pass
+        
+        # Call phase generation method
+        basename_withpath=os.path.splitext(original_script_name)[0]
+        basename=os.path.split(basename_withpath)[1]
+        output_directory=process.output_dir(basename_withpath)
+
+        # Create output directory if needed
+        if not os.path.exists(output_directory):
+            os.mkdir(oiutput_directory)
+            pass
+
+        if DELAMO_SCRIPT:
+            thisphase_tree = generate_method(basename,basename_withpath,output_directory,phase_names[phasenum],prevphase_tree)
+            processor.tree_to_file(thisphase_tree,thisphase_script)
+            pass
+        else:
+            generate_method(basename,basename_withpath,output_directory,phase_names[phasenum],prevphase_tree)
+            pass
+               
+        pass
+    elif command.upper() == "BUILDMODEL" or command.upper()=="BM" or command.upper()=="BMINTERACT":
+        directory = os.path.split(original_script_name)[0]
+
+        
+        (thisphase_dir,thisphase_script)=process.generate_scriptname_for_phase(original_script_name,phase_names[phasenum])
+
+
+        # Preclean, if present
+        if len(process_phases[phasenum]) >= 3 and "preclean_method" in process_phases[phasenum][2]:
+            basename_withpath=os.path.splitext(original_script_name)[0]
+            basename=os.path.split(basename_withpath)[1]
+            output_directory=process.output_dir(basename_withpath)
+            
+            preclean_method = process_phases[phasenum][2]["preclean_method"]
+            preclean_method(basename,basename_withpath,output_directory,phase_names[phasenum])
+            pass
+
+        
+        if len(directory) > 0:
+            print("  cd %s" % (directory))
+            pass
+
+        params = [sys.executable]
+        if command.upper()=="BMINTERACT":
+            params.append("-i")
+            pass
+        params.append(thisphase_script)
+        
+        print("  %s" % (" ".join(params)))
+
+        if len(directory)==0:
+            directory=None
+            pass
+        
+        try:
+            subprocess.check_call(params,cwd=directory,env=newenviron)
+            pass
+        except subprocess.CalledProcessError:
+            print("")
+            print("Error executing model builder")
+            pass
+        pass
+    elif command.upper() == "FEBATCH":
+        (output_dir,script_to_generate_path,cad_file_path,script_to_generate_name,cad_file_name) = process.output_filenames_for_phase(original_script_name,phase_names[phasenum],process_name)
+        if len(output_dir) > 0:            
+            print("  cd %s" % (output_dir))
+            pass
+        else:
+            output_dir=None
+            pass
+
+        if os.name=='nt':
+            abaqusname='abaqus.bat'
+            pass
+        abaqusname="abaqus"
+        
+        params = [abaqusname,"cae","noGUI=%s" % (script_to_generate_name)]
+        print("  %s" % (" ".join(params)))
+        
+        p=subprocess.Popen(params,cwd=output_dir)
+        if os.name=='nt':
+            p.communicate()  # Windows doesn't seem to want to run in the background
+            pass
+        pass
+    elif command.upper() == "FEINTERACT":
+        (output_dir,script_to_generate_path,cad_file_path,script_to_generate_name,cad_file_name) = process.output_filenames_for_phase(original_script_name,phase_names[phasenum],process_name)
+        
+        if len(output_dir) > 0:            
+            print("  cd %s" % (output_dir))
+            pass
+        else:
+            output_dir=None
+            pass
+
+        if os.name=='nt':
+            abaqusname='abaqus.bat'
+            pass
+        abaqusname="abaqus"
+        params = [abaqusname,"cae","script=%s" % (script_to_generate_name)]
+        print("  %s" % (" ".join(params)))
+        p=subprocess.Popen(params,cwd=output_dir)
+        if os.name=='nt':
+            p.communicate()  # Windows doesn't seem to want to run in the background
+            pass
+        
+        pass
+    else:
+        print("Unknown command %s" % (command.upper()))
+        pass
+    pass
+
+    
