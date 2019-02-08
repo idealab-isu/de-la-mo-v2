@@ -196,8 +196,8 @@ class OCCModelBuilder(object):
         # For the moment assume only one edge
         
         build=BRep_Builder()
-        #Perimeter=TopoDS_Compound()
-        #build.MakeCompound(Perimeter)
+        Perimeter=TopoDS_Compound()
+        build.MakeCompound(Perimeter)
         
         origwire = TopoDS_Wire()
         build.MakeWire(origwire)
@@ -224,22 +224,25 @@ class OCCModelBuilder(object):
         
         SideShape = SideGenerator.Shape()
         
-        #build.Add(Perimeter,SideShape)
-        
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer2.Write("../data/outersurf.STEP")
+        build.Add(Perimeter,SideShape)
 
         GASplitter=GEOMAlgo_Splitter()
-        GASplitter.AddArgument(layerbodyface1.Face)
+        GASplitter.AddArgument(topods_Face(layerbodyface1.Face))
         GASplitter.AddTool(SideShape)
         GASplitter.Perform()
+
+        #if (not GASplitter.IsDone()):
+        #    raise ValueError("Splitting face failed\n")
+
         SplitFace= GASplitter.Shape()
         # Hopefully this did not damage layerbodyface1
         
-        step_writer3=STEPControl_Writer()
-        step_writer3.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer3.Write("../data/splitted.STEP")
+        step_writer2=STEPControl_Writer()
+        step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer2.Transfer(layerbody1.Shape, STEPControl_ManifoldSolidBrep, True)
+        step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer2.Write("../data/allShapes.STEP")
 
         split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
         # Iterate over all faces
