@@ -91,7 +91,7 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
 
         # Find the closest point by this method:
         # https://www.opencascade.com/content/closest-point-step-object
-        DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPoint)
+        DistanceCalculator = BRepExtrema_DistShapeShape(TopoDS_Shape(Face), origPoint)
         DistanceCalculator.Perform()
         currentDist = DistanceCalculator.Value()
 
@@ -208,7 +208,15 @@ class Layer(object):
                                                                False, False,
                                                                GeomAbs_Arc)
         assert (mkOffset.IsDone())
+
         OffsetShell = mkOffset.Shape()
+
+        ## Convert result of offsetting operation (from mkOffset.Shape()) into NURBS
+        #OffsetUnconverted = mkOffset.Shape()
+        #NurbsConverter = BRepBuilderAPI.BRepBuilderAPI_NurbsConvert(OffsetUnconverted,False)
+        #OffsetShell = NurbsConverter.Shape()
+
+        
 
         # Build list OffsetFaces of faces in OffsetShell
         OffsetShellFacesExp = TopExp_Explorer(OffsetShell,TopAbs_FACE)
@@ -427,6 +435,51 @@ class LayerBody(object):
             pass
         pass
 
+    def _Initializing_Layerbody_Construct_Shape(self):
+        # Build/rebuild the .Shape attribute from the Face Lists: FaceListOrig, FaceListOffset, and FaceListSide
+        # SHOULD ONLY BE CALLED DURING INITIALIZATION OF A NEW LayerBody (as LayerBody is generally supposed to be immutable)
+
+        # Now we have to sew all of these pieces together
+        # (with a thread!)
+        thread = BRepBuilderAPI.BRepBuilderAPI_Sewing()  # sewing tool
+
+        for Face in self.FaceListOrig:            
+            thread.Add(Face.Face)
+            pass
+
+        for Face in self.FaceListOffset:            
+            thread.Add(Face.Face)
+            pass
+
+        for Face in self.FaceListSide:            
+            thread.Add(Face.Face)
+            pass
+
+        thread.Perform()
+        
+        sewedShell = thread.SewedShape()
+        
+        # if it is a closed shell, turn it into a solid if possible
+        if sewedShell.ShapeType() != TopAbs_SHELL or not sewedShell.Closed():
+            raise ValueError("Resulting solid either not a shell or not closed")
+        
+        # SolidMaker = BRepBuilderAPI.BRepBuilderAPI_MakeSolid(TopoDS.Shell(ResultShape))
+        solidMaker = BRepBuilderAPI.BRepBuilderAPI_MakeSolid()
+        solidMaker.Add(topods_Shell(sewedShell))
+        if not solidMaker.IsDone():
+            raise ValueError("Solid maker failed")
+
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Break")
+        solidShape = solidMaker.Solid()
+        
+        if not BRepLib.breplib_OrientClosedSolid(solidShape):
+            raise ValueError("Solid maker did not yield a closed solid")
+        # We successfully got a closed solid
+        self.Shape = solidShape
+        pass
+    
     pass
 
 
@@ -627,7 +680,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
     # should be covered by Direction=="ORIG"
     Direction = None # "ORIG", "OFFSET", "SIDE", or "NODIR", representing the side of the Owning LayerBody which corresponds to this Face
 
-    Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part. 
+    Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part. ****!!!! NOTE: as of 2/8/19, not always updated when we do delamination splits!!!***
     
     BCType = None # Formerly DelaminationType: None, "NODELAM" "NOMODEL", "COHESIVE", "CONTACT" or, "TIE"
     # MatchingFace = None # Formerly SurfPair, This would be the matching LayerBodyFace in the adjacent (or non-adjacent)

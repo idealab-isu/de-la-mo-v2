@@ -1,4 +1,5 @@
 import sys
+import copy
 import os.path
 from OCC.TopoDS import topods
 
@@ -54,6 +55,8 @@ import loaders
 import layer
 
 
+
+
 class OCCModelBuilder(object):
     """The OCCModelBuilder contains global parameters 
     for constructing laminates using the OpenCascade geometry kernel plus various methods.
@@ -89,7 +92,81 @@ class OCCModelBuilder(object):
             setattr(self,argname,kwargs[argname])
             pass
         pass
+
+    def ProjectEdgesOntoFace(self,edge_edges,face):
+        edge_curves = [ BRep_Tool.Curve(edge) for edge in edge_edges ]
+
+        surface = BRep_Tool.Surface(face)
+        
+        
+        # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
+        Projections = [ GeomProjLib.geomprojlib_Project(edge_curve[0],surface) for edge_curve in edge_curves ]
+
+        # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
+        # But it's probably OK not to, because we are using the projection to make a tool that will be used to cut the face
+        # and the extension of the tool beyond the face boundary shouldn't cause any problems, at least so long as thath
+        # geometry doesn't get too weird
+        
+        ProjectionEdges = [ BRepBuilderAPI.BRepBuilderAPI_MakeEdge(Projection).Edge() for Projection in Projections ]
+
+        # If we did trimmming, we would need to construct wire from the edge(s) that actually projected to something within the face,
+        # with any gaps filled by appropriately trimmed edges from the face.
+
+        #ProjectedWireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+        #
+        #for ProjectionEdge in ProjectionEdges:
+        #    ProjectedWireBuilder.add(ProjectionEdge)
+        #    pass
+        #
+        # ProjectedWire = ProjectedWireBuilder.Wire()
+
+        # Need to take ProjectionEdges, which are located on layerbodysurface1
+        # and perform a offset from the surface
+        return ProjectionEdges
     
+    def OffsetFaceInBothDirections(self,face):
+        OffsetDist = 100.0*self.PointTolerance
+        # (do we need to convert face into a shell?) 
+        mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, OffsetDist, self.PointTolerance,
+                                                                BRepOffset.BRepOffset_Skin,
+                                                                False, False,
+                                                                GeomAbs_Arc)
+        assert (mkOffset1.IsDone())
+        
+        OffsetShell1 = mkOffset1.Shape()
+        
+        OffsetShell1FacesExp = TopExp_Explorer(OffsetShell1,TopAbs_FACE)
+        OffsetFaces1 = []
+
+        while OffsetShell1FacesExp.More():
+            OffsetFaces1.append(topods_Face(OffsetShell1FacesExp.Current()))
+            OffsetShell1FacesExp.Next()
+            pass
+        
+        assert(len(OffsetFaces1)==1) # Offset of a single face should give a single face
+
+
+        mkOffset2 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, -OffsetDist, self.PointTolerance,
+                                                                BRepOffset.BRepOffset_Skin,
+                                                                False, False,
+                                                                GeomAbs_Arc)
+        assert (mkOffset2.IsDone())
+        
+        OffsetShell2 = mkOffset2.Shape()
+        
+        OffsetShell2FacesExp = TopExp_Explorer(OffsetShell2,TopAbs_FACE)
+        OffsetFaces2 = []
+
+        while OffsetShell2FacesExp.More():
+            OffsetFaces2.append(topods_Face(OffsetShell2FacesExp.Current()))
+            OffsetShell2FacesExp.Next()
+            pass
+        
+        assert(len(OffsetFaces2)==1) # Offset of a single face should give a single face
+
+        return (OffsetFaces1[0],OffsetFaces2[0])
+    
+
     
     # Class methods
     def Unique(self):
@@ -123,10 +200,11 @@ class OCCModelBuilder(object):
 
         return CommonFaces
 
-    def process_delamination(self,layerbody1,layerbodyface1,layerbody2,layerbodyface2,delam_outline):
+    def imprint_delaminations(self,layerbody,layerbodyface,delam_outlines):
         """Given a first layerbody and corresponding face, and a second 
-        layerbody and corresponding face, and a delamination outline 
+        layerbody and corresponding face, and a list of delamination outlines 
         (loop of 3D coordinates, hopefully projected onto the faces): 
+         A. Loop over each delam outline
            1. Identify the regions of facebody1/2 that are inside delam_outline
            2. Create an offset curve a distance of self.GapWidth inside delam_outline
            3. Imprint both delam_outline and the offset curve
@@ -134,11 +212,11 @@ class OCCModelBuilder(object):
               curve to have "NOMODEL" BCType unless they already had "CONTACT" BCType 
            5. Identify the regions of facebody1/2 that are inside the offset curve to have "CONTACT"
               BCType
-           6. Generate new replacements for layerbody1 and layerbody2 with newly constructed
+          B. Generate new replacements for layerbody1 and layerbody2 with newly constructed
               imprinted faces, marked as determined above. 
-           7. The replaced layerbody1 and layerbody2 may have facebody1 and facebody2 
+           1. The replaced layerbody1 and layerbody2 may have facebody1 and facebody2 
               replaced/subdivided, but other faces in layerbodies1/2 should remain unchanged. 
-           8. Return (replacement_layerbody1, replacement_layerbody2)"""
+          C. Return (replacement_layerbody1, replacement_layerbody2)"""
 
         # NOTE: May need additional parameters (adjacent surfaces or faces?) to do the
         # delam_outline offset curve?
@@ -146,101 +224,96 @@ class OCCModelBuilder(object):
         # NOTE: When regenerating layerbodies, do NOT give them new names unless they are being
         # split (which they aren't from this function)
 
-        # ***!!! Temporarily load curve rather than constructing wire from delamination outline
-        WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
 
-        exp=TopExp_Explorer(WireShape,TopAbs_EDGE)
+        SideShapes=[]
         
-        # Iterate over all edges
-        edge_shapes=[]
-        while exp.More():
-            edge_shapes.append(exp.Current())
+        for delam_outline in delam_outlines:
+            # ***!!! Temporarily load curve rather than constructing wire from delamination outline
+
+            # ***!!! Still need to implement in-plane offsets
+            WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
+
+            exp=TopExp_Explorer(WireShape,TopAbs_EDGE)
             
-            exp.Next()
+            # Iterate over all edges
+            edge_shapes=[]
+            while exp.More():
+                edge_shapes.append(exp.Current())
+                
+                exp.Next()
+                pass
+
+            
+            
+            edge_edges = [ topods_Edge(edge_shape) for edge_shape in edge_shapes ]
+
+            
+
+            # layerbodyface
+            
+            (bounding_face_a,bounding_face_b) = self.OffsetFaceInBothDirections(layerbodyface.Face)
+            
+            ProjectionEdges_a = self.ProjectEdgesOntoFace(edge_edges,bounding_face_a)
+            ProjectionEdges_b = self.ProjectEdgesOntoFace(edge_edges,bounding_face_b)
+
+        
+            # Generate faces connecting original and projected edges.
+            # We will use this as a tool to do the cut. 
+            
+            # For the moment assume only one edge
+        
+            build=BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+            Perimeter=TopoDS_Compound()
+            build.MakeCompound(Perimeter)
+            
+            wire_a = TopoDS_Wire()
+            build.MakeWire(wire_a)
+            wire_b = TopoDS_Wire()
+            build.MakeWire(wire_b)
+        
+            for edgecnt in range(len(edge_edges)):
+                projectionedge_a = ProjectionEdges_a[edgecnt]
+                projectionedge_b = ProjectionEdges_b[edgecnt]
+                
+                
+                build.Add(wire_a,projectionedge_a)
+                build.Add(wire_b,projectionedge_b)
+                pass
+            
+            # Generate side faces
+            SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
+            SideGenerator.AddWire(wire_a)
+            SideGenerator.AddWire(wire_b)
+            SideGenerator.Build()
+            
+            if (not SideGenerator.IsDone()):
+                raise ValueError("Side face generation failed\n")
+        
+            SideShape = SideGenerator.Shape()
+            
+            build.Add(Perimeter,SideShape)
+            SideShapes.append(SideShape)
             pass
-
-        edge_edges = [ topods_Edge(edge_shape) for edge_shape in edge_shapes ]
-
-        edge_curves = [ BRep_Tool.Curve(edge) for edge in edge_edges ]
-
-
-        # layerbodyface1
-
-        layerbodysurface1 = BRep_Tool.Surface(layerbodyface1.Face)
-
-        # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
-        Projections = [ GeomProjLib.geomprojlib_Project(edge_curve[0],layerbodysurface1) for edge_curve in edge_curves ]
-
-        # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
-        # But it's probably OK not to, because we are using the projection to make a tool that will be used to cut the face
-        # and the extension of the tool beyond the face boundary shouldn't cause any problems, at least so long as thath
-        # geometry doesn't get too weird
         
-        ProjectionEdges = [ BRepBuilderAPI.BRepBuilderAPI_MakeEdge(Projection).Edge() for Projection in Projections ]
-
-        # If we did trimmming, we would need to construct wire from the edge(s) that actually projected to something within the face,
-        # with any gaps filled by appropriately trimmed edges from the face.
-
-        #ProjectedWireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
-        #
-        #for ProjectionEdge in ProjectionEdges:
-        #    ProjectedWireBuilder.add(ProjectionEdge)
-        #    pass
-        #
-        # ProjectedWire = ProjectedWireBuilder.Wire()
-
-
-        # Generate faces connecting original and projected edges.
-        # We will use this as a tool to do the cut. 
-
-        # For the moment assume only one edge
-        
-        build=BRep_Builder()
-        Perimeter=TopoDS_Compound()
-        build.MakeCompound(Perimeter)
-        
-        origwire = TopoDS_Wire()
-        build.MakeWire(origwire)
-        projwire = TopoDS_Wire()
-        build.MakeWire(projwire)
-        
-        for edgecnt in range(len(edge_edges)):
-            edge=edge_edges[edgecnt]
-            projectionedge = ProjectionEdges[edgecnt]
             
-            
-            build.Add(origwire,edge)
-            build.Add(projwire,projectionedge)
-            pass
-
-        # Generate side faces
-        SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
-        SideGenerator.AddWire(origwire)
-        SideGenerator.AddWire(projwire)
-        SideGenerator.Build()
-        
-        if (not SideGenerator.IsDone()):
-            raise ValueError("Side face generation failed\n")
-        
-        SideShape = SideGenerator.Shape()
-        
-        build.Add(Perimeter,SideShape)
-
         GASplitter=GEOMAlgo_Splitter()
-        GASplitter.AddArgument(topods_Face(layerbodyface1.Face))
-        GASplitter.AddTool(SideShape)
+        GASplitter.AddArgument(topods_Face(layerbodyface.Face))
+        for SideShape in SideShapes:
+            GASplitter.AddTool(SideShape)
+            pass
+        
         GASplitter.Perform()
 
         #if (not GASplitter.IsDone()):
         #    raise ValueError("Splitting face failed\n")
 
         SplitFace= GASplitter.Shape()
-        # Hopefully this did not damage layerbodyface1
+        # Hopefully this did not damage layerbodyface
         
         step_writer2=STEPControl_Writer()
         step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer2.Transfer(layerbody1.Shape, STEPControl_ManifoldSolidBrep, True)
-        step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
         step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
         step_writer2.Write("../data/allShapes.STEP")
 
@@ -248,8 +321,22 @@ class OCCModelBuilder(object):
         # Iterate over all faces
         numsplitfaces = 0
         split_face_shapes=[]
+        split_layerbodyfaces=[]
         while split_face_exp.More():
-            split_face_shapes.append(split_face_exp.Current())
+            split_face_shape=split_face_exp.Current()
+            split_face_shapes.append(split_face_shape)
+
+            split_face = topods_Face(split_face_shape)
+            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
+            
+            split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
+                                                      Point=Point,
+                                                      Normal=Normal,
+                                                      ParPoint=ParPoint,
+                                                      Direction=layerbodyface.Direction,
+                                                      Owner=layerbodyface.Owner,
+                                                      BCType="TIE")) # !!!*** BCType needs to be set correctly ***!!!
+            
             numsplitfaces = numsplitfaces +1
 
             split_face_exp.Next()
@@ -262,77 +349,54 @@ class OCCModelBuilder(object):
 
 
         # Create a new layerbody with the split face
-        DelamLayerBody1 = LayerBody()
-        DelamLayerBody1.Name = layerbody1.Name
-        DelamLayerBody1.Owner = layerbody1.Owner
+        DelamLayerBody = copy.copy(layerbody)  # non-deep copy
+        # in the copy we are initializing, assign the face lists with
+        # the face we are replacing removed, and with the new faces
+        # we have created, added.
 
-        sys.modules["__main__"].__dict__.update(globals())
-        sys.modules["__main__"].__dict__.update(locals())
-        raise ValueError("Break")
-
-
-        # Now we have to sew all of these pieces together
-        # (with a thread!)
-        thread = BRepBuilderAPI.BRepBuilderAPI_Sewing()  # sewing tool
-        # Add the other faces of the layerbody1
-        for layerbodyface in layerbody1.FaceListOrig:
-            if (layerbodyface != layerbodyface1):
-                DelamLayerBody1.FaceListOrig.append(layerbodyface)
-                thread.Add(layerbodyface.Face)
-            else:
-                for split_face in split_face_shapes:
-                    DelamLayerBody1.FaceListOrig.append(LayerBodyFace.FromOCC(split_face,"ORIG",Owner=DelamLayerBody1))
-                    thread.Add(split_face)
-                    pass
+        DelamLayerBody.FaceListOrig = layerbody.FaceListOrig
+        if layerbodyface in DelamLayerBody.FaceListOrig:
+            # Remove original face
+            del DelamLayerBody.FaceListOrig[DelamLayerBody.FaceListOrig.index(layerbodyface)]
+            # Add new faces
+            for split_face_shape in split_face_shapes:
+                DelamLayerBody.FaceListOrig.append(topods_Face(split_face_shape))
+                pass
             pass
 
-        for layerbodyface in layerbody1.FaceListOffset:
-            if (layerbodyface != layerbodyface1):
-                DelamLayerBody1.FaceListOffset.append(layerbodyface)
-                thread.Add(layerbodyface.Face)
-            else:
-                for split_face in split_face_shapes:
-                    #DelamLayerBody1.FaceListOffset.append(LayerBodyFace.FromOCC(split_face,"OFFSET",Owner=DelamLayerBody1))
-                    thread.Add(split_face)
-                    pass
+        DelamLayerBody.FaceListOffset = layerbody.FaceListOffset
+        if layerbodyface in DelamLayerBody.FaceListOffset:
+            # Remove offset face
+            del DelamLayerBody.FaceListOffset[DelamLayerBody.FaceListOffset.index(layerbodyface)]
+            # Add new faces
+            for split_face_shape in split_face_shapes:
+                DelamLayerBody.FaceListOffset.append(topods_Face(split_face_shape))
+                pass
             pass
 
-        for layerbodyface in layerbody1.FaceListSide:
-            DelamLayerBody1.FaceListSide.append(layerbodyface)
-            pass
+        
 
-        thread.Perform()
-        sewedShell = thread.SewedShape()
+        # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
+        
+        # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
 
-        # if it is a closed shell, turn it into a solid if possible
-        if sewedShell.ShapeType() != TopAbs_SHELL or not sewedShell.Closed():
-            raise ValueError("Resulting solid either not a shell or not closed")
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Break")
 
-        # SolidMaker = BRepBuilderAPI.BRepBuilderAPI_MakeSolid(TopoDS.Shell(ResultShape))
-        solidMaker = BRepBuilderAPI.BRepBuilderAPI_MakeSolid()
-        solidMaker.Add(topods_Shell(sewedShell))
-        if not solidMaker.IsDone():
-            raise ValueError("Solid maker failed")
+        DelamLayerBody._Initializing_Layerbody_Construct_Shape()
+        
 
-        delamSolidShape = solidMaker.Solid()
-
-        if not BRepLib.breplib_OrientClosedSolid(delamSolidShape):
-            raise ValueError("Solid maker did not yield a closed solid")
-        # We successfully got a closed solid
-
-        DelamLayerBody1.Shape = delamSolidShape
-
-        step_writer = STEPControl_Writer()
-        step_writer.Transfer(delamSolidShape, STEPControl_ManifoldSolidBrep, True)
-        step_writer.Write("../Data/Layers.step")
+        #step_writer = STEPControl_Writer()
+        #step_writer.Transfer(delamSolidShape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer.Write("../Data/Layers.step")
 
         # Also need to repeat the process for the other face
 
         # (so actual content of this function should be abstracted into
         # a new function we can call twice). 
 
-        
-        raise NotImplementedError()
+        return DelamLayerBody
 
     def apply_delaminations(self,layer1,layer2,delaminationlist):
         """Iterate over the layerbodies of layer1 and layer2. For each pair of layerbodies, 
@@ -351,11 +415,10 @@ class OCCModelBuilder(object):
                 CommonFaces=self.eval_face_pairs(lb1,lb2)
 
                 for CommonFace in CommonFaces:
-                    for delamination in delaminationlist:
-                        (replacement_lb1,replacement_lb2)=self.process_delamination(lb1,CommonFace,lb2,CommonFaces[CommonFace],delamination)
-                        layer1.BodyList[lb1cnt]=replacement_lb1
-                        layer2.BodyList[lb2cnt]=replacement_lb2
-                        pass
+                    replacement_lb1=self.imprint_delaminations(lb1,CommonFace,delaminationlist)
+                    replacement_lb2=self.imprint_delaminations(lb2,CommonFaces[CommonFace],delaminationlist)
+                    layer1.BodyList[lb1cnt]=replacement_lb1
+                    layer2.BodyList[lb2cnt]=replacement_lb2
                     pass
 
                 pass
@@ -435,7 +498,9 @@ if __name__=="__main__":
     
     Mold = layer.LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
     Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
+    #Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"ORIG",1e-6)
     Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
+    #Layer2=layer.Layer.CreateFromMold("Layer 2",Mold,2.0,"OFFSET",1e-6)
 
     #delaminationlist = [ ]
     delaminationlist = [ os.path.join("..","data","nasa-delam-12-1.csv") ]
