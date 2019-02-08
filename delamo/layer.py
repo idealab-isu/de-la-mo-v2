@@ -87,17 +87,27 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     if (C.State()!=TopAbs_IN):
 
         origPoint = facePoint
+        origPointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(origPoint).Vertex()
         origParPoint = refParPoint
 
         # Find the closest point by this method:
         # https://www.opencascade.com/content/closest-point-step-object
-        DistanceCalculator = BRepExtrema_DistShapeShape(TopoDS_Shape(Face), origPoint)
+        DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPointVertex)
         DistanceCalculator.Perform()
         currentDist = DistanceCalculator.Value()
 
         if DistanceCalculator.NbSolution() > 0:
             closestDist = currentDist
             # Evaluate (u,v) coordinates on this face of closest point
+            # !!!*** ParOnFaceS1 seems to fail sometimes
+            # because OCC finds an edge closer.
+            # In that case you can call DistanceCalculator.ParOnEdgeS1(1)
+            # to get the coordinate along the edge.
+            # You can identify which type the support is
+            # by calling DistanceCalculator.SupportOnShape(1).ShapeType()
+            # and comparing with TopAbs_EDGE, etc.
+            # From the documentation it looks like you might get
+            # TopAbs_VERTEX, as well 
             (ClosestU, ClosestV) = DistanceCalculator.ParOnFaceS1(1)
 
             angleIncrement = 1
