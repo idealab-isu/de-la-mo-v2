@@ -1,6 +1,7 @@
 import sys
 import copy
 import os.path
+import csv
 from OCC.TopoDS import topods
 
 from OCC.TopoDS import TopoDS_Face
@@ -35,6 +36,7 @@ from OCC.TopAbs import TopAbs_SHELL
 from OCC.TopAbs import TopAbs_FORWARD
 from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
+from OCC.Geom import Geom_Line
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
 from OCC.GeomLProp import GeomLProp_SLProps
 from OCC.gp import gp_Pnt2d
@@ -231,7 +233,71 @@ class OCCModelBuilder(object):
             # ***!!! Temporarily load curve rather than constructing wire from delamination outline
 
             # ***!!! Still need to implement in-plane offsets
-            WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
+            # delam_outline is the file name
+            delam_outlist = []
+            with open(delam_outline) as csvfile:
+                reader=csv.reader(csvfile,delimiter=',',quotechar='"')
+                for row in reader:
+                    if len(row) != 3:
+                        raise ValueError("Malformed row in CSV file %s: %s" % (delam_outline,",".join(row)))
+                    try:
+                        x=float(row[0])
+                        y=float(row[1])
+                        z=float(row[2])
+                        delam_outlist.append((x,y,z))
+                        pass
+                    except ValueError:
+                        pass
+                    pass
+                pass
+
+            if len(delam_outlist) == 0:
+                raise ValueError("Could not parse any lines from CSV file %s" % (delam_outline))
+
+            if delam_outlist[0] != delam_outlist[-1]:
+                raise ValueError("Delamination outline from %s does not form a closed wire (first and last vertices do not match)" % (delam_outline))
+            
+            commented = r"""
+            # Create wire from delam_outlist
+            WireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+            last_point = gp_Pnt(delam_outlist[-2][0],delam_outlist[-2][1],delam_outlist[-2][2])  # -2 because this is the last unique point -- as distinct from the last entry which matches the first entry 
+            last_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(last_point).Vertex()
+            previous_point = last_point
+            previous_vertex = last_vertex
+            for pos in range(len(delam_outlist)-1): # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments 
+                if pos == len(delam_outlist)-1:
+                    current_point = last_point
+                    current_vertex = last_vertex                    
+                    pass
+                else:
+                    current_point = gp_Pnt(delam_outlist[pos][0],delam_outlist[pos][1],delam_outlist[pos][2])
+                    current_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(current_point).Vertex()
+                    pass
+
+                linedir = gp_Dir(gp_Vec(previous_point,current_point))
+                curve=Geom_Line(previous_point,linedir)
+                
+                current_edge_builder = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(curve.GetHandle(), previous_vertex,current_vertex)
+                current_edge=current_edge_builder.Edge()
+                WireBuilder.Add(current_edge)
+
+                previous_point = current_point
+                previous_vertex = current_vertex
+                pass
+            WireShape = WireBuilder.Wire()
+            """
+
+            PolyBuilder = BRepBuilderAPI.BRepBuilderAPI_MakePolygon()
+            for pos in range(len(delam_outlist)-1): # If there are n entries in
+                current_point = gp_Pnt(delam_outlist[pos][0],delam_outlist[pos][1],delam_outlist[pos][2])
+                current_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(current_point).Vertex()
+                PolyBuilder.Add(current_vertex)
+                pass
+            PolyBuilder.Close()
+            WireShape=PolyBuilder.Wire()
+            
+            assert(WireShape.Closed())
+            #WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
 
             exp=TopExp_Explorer(WireShape,TopAbs_EDGE)
             
@@ -503,7 +569,7 @@ if __name__=="__main__":
     #Layer2=layer.Layer.CreateFromMold("Layer 2",Mold,2.0,"OFFSET",1e-6)
 
     #delaminationlist = [ ]
-    delaminationlist = [ os.path.join("..","data","nasa-delam-12-1.csv") ]
+    delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv") ]
 
     #defaultBCType = 2
     #FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
@@ -514,6 +580,6 @@ if __name__=="__main__":
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
-    step_writer.Write(os.path.join("..","Data","Layers.step"))
+    step_writer.Write(os.path.join("..","data","Layers.step"))
 
     pass
