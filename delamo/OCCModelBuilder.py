@@ -359,8 +359,8 @@ class OCCModelBuilder(object):
             # Remove original face
             del DelamLayerBody.FaceListOrig[DelamLayerBody.FaceListOrig.index(layerbodyface)]
             # Add new faces
-            for split_face_shape in split_face_shapes:
-                DelamLayerBody.FaceListOrig.append(topods_Face(split_face_shape))
+            for split_layerbodyface in split_layerbodyfaces:
+                DelamLayerBody.FaceListOffset.append(split_layerbodyface)
                 pass
             pass
 
@@ -369,8 +369,8 @@ class OCCModelBuilder(object):
             # Remove offset face
             del DelamLayerBody.FaceListOffset[DelamLayerBody.FaceListOffset.index(layerbodyface)]
             # Add new faces
-            for split_face_shape in split_face_shapes:
-                DelamLayerBody.FaceListOffset.append(topods_Face(split_face_shape))
+            for split_layerbodyface in split_layerbodyfaces:
+                DelamLayerBody.FaceListOffset.append(split_layerbodyface)
                 pass
             pass
 
