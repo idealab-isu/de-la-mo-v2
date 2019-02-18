@@ -310,12 +310,12 @@ class OCCModelBuilder(object):
         SplitFace= GASplitter.Shape()
         # Hopefully this did not damage layerbodyface
         
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
-        #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
-        step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer2.Write("../data/allShapes.STEP")
+        # step_writer2=STEPControl_Writer()
+        # step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        # step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
+        # #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        # step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
+        # step_writer2.Write("../data/allShapes.STEP")
 
         split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
         # Iterate over all faces

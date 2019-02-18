@@ -26,6 +26,7 @@ from OCC import BRepBuilderAPI
 from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
 from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
+from OCC.ShapeAnalysis import ShapeAnalysis_Surface
 from OCC.BRepTools import breptools_Read
 from OCC.TopExp import TopExp_Explorer
 from OCC.TopAbs import TopAbs_ON
@@ -54,7 +55,6 @@ from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
 import loaders
-
 
 
 # Parametric space search start location for FindOCCPointNormal()
@@ -97,6 +97,7 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
         currentDist = DistanceCalculator.Value()
 
         if DistanceCalculator.NbSolution() > 0:
+
             closestDist = currentDist
             # Evaluate (u,v) coordinates on this face of closest point
             # !!!*** ParOnFaceS1 seems to fail sometimes
@@ -107,11 +108,21 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
             # by calling DistanceCalculator.SupportOnShape(1).ShapeType()
             # and comparing with TopAbs_EDGE, etc.
             # From the documentation it looks like you might get
-            # TopAbs_VERTEX, as well 
-            (ClosestU, ClosestV) = DistanceCalculator.ParOnFaceS1(1)
+            # TopAbs_VERTEX, as well
+
+            # Alternate method that might work is calculate the 3D point and
+            # then calculate the parametric value on the face
+            #(ClosestU, ClosestV) = DistanceCalculator.ParOnFaceS1(1)
+
+            currentCP = DistanceCalculator.PointOnShape1(1)
+            SAS = ShapeAnalysis_Surface(faceSurface)
+            currentUV = SAS.ValueOfUV(currentCP, OrigPointTolerance)
+            ClosestU = currentUV.X()
+            ClosestV = currentUV.Y()
 
             angleIncrement = 1
             parIncrement = 0.01
+            pointFound = False
             for angle in xrange(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
                 newV = ClosestV + parIncrement * math.sin(angle*math.pi/180.0)
@@ -129,11 +140,12 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
                         # Face is reversed from underlying surface -> we need to flip the normal
                         faceNormal = -faceNormal
                         pass
-
+                    pointFound = True
                     break
                 pass
 
-            raise ValueError("Point inside face not found!")
+            if (not pointFound):
+                raise ValueError("Point inside face not found!")
 
             pass
 
