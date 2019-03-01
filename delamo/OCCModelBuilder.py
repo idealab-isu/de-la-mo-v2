@@ -133,7 +133,7 @@ class OCCModelBuilder(object):
         return ProjectionEdges
     
     def OffsetFaceInBothDirections(self,face):
-        OffsetDist = 100.0*self.PointTolerance
+        OffsetDist = 100000.0*self.PointTolerance
         # (do we need to convert face into a shell?) 
         mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, OffsetDist, self.PointTolerance,
                                                                 BRepOffset.BRepOffset_Skin,
@@ -286,13 +286,13 @@ class OCCModelBuilder(object):
             WireShape = WireBuilder.Shape()
             assert(WireShape.Closed())
 
-            # step_writer2=STEPControl_Writer()
-            # step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
-            # step_writer2.Write("../data/Wire.STEP")
+            #step_writer2=STEPControl_Writer()
+            #step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
+            #step_writer2.Write("../data/Wire.STEP")
             #
-            # sys.modules["__main__"].__dict__.update(globals())
-            # sys.modules["__main__"].__dict__.update(locals())
-            # raise ValueError("Break")
+            #sys.modules["__main__"].__dict__.update(globals())
+            #sys.modules["__main__"].__dict__.update(locals())
+            #raise ValueError("Break")
 
             # Loading WireShape directly from a STEP file
             #WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
@@ -367,12 +367,12 @@ class OCCModelBuilder(object):
         SplitFace= GASplitter.Shape()
         # Hopefully this did not damage layerbodyface
         
-        # step_writer2=STEPControl_Writer()
-        # step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        # #step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
-        # #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
-        # #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
-        # step_writer2.Write("../data/allShapes.STEP")
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        ##step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
+        ##step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Write("../data/allShapes.STEP")
 
         split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
         # Iterate over all faces
@@ -482,7 +482,7 @@ class OCCModelBuilder(object):
             pass
         pass
     
-    def adjacent_layers(self,layer1,layer2,defaultbc,bc_map=None):
+    def adjacent_layers(self,layer1,layer2,bc_map=None):
         """ Once adjacent_layers() is called, the LayerBody's in EITHER layer can't be split
         anymore -- because then they might need new names,
         and the return values contain the layer body names that will be used
@@ -500,7 +500,7 @@ class OCCModelBuilder(object):
                     assert(lb2.Name is not None)
                     
                     if BCType is None: # BCType not otherwise set... insert default
-                        BCType=defaultbc
+                        BCType="TIE"
                         pass
                     elif bc_map is not None:
                         # apply user-supplied BC mapping

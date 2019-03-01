@@ -19,8 +19,10 @@ from OCC.BRep import BRep_Builder
 from OCC.BRep import BRep_Tool
 from OCC.BRepExtrema import BRepExtrema_DistShapeShape
 from OCC import BRepLib
+from OCC.BRepLib import BRepLib_FuseEdges
 from OCC import BRepOffsetAPI
 from OCC import BRepOffset
+from OCC import BRepFeat
 from OCC import BRepBuilderAPI
 #from OCC.BRepClass import BRepClass_FacePassiveClassifier
 from OCC.BRepClass import BRepClass_FaceExplorer
@@ -229,6 +231,11 @@ class Layer(object):
                                                                BRepOffset.BRepOffset_Skin,
                                                                False, False,
                                                                GeomAbs_Arc)
+
+        step_writer2=STEPControl_Writer()
+        step_writer2.Transfer(Mold.Shape,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer2.Write("/tmp/OffsetFace.step")
+
         assert (mkOffset.IsDone())
 
         OffsetShell = mkOffset.Shape()
@@ -656,17 +663,31 @@ class LayerMold(object):
         # should already share edges and vertices, we should be able to use BRep_Builder.
         # ... if this fails then could maybe try BRepOffsetAPI_Sewing
 
-        Builder=BRep_Builder();
-        Shell=TopoDS_Shell();
-        Builder.MakeShell(Shell);
-        for FaceList in FaceLists:
-            for Face in FaceList:  # Face is a LayerBodyFace
-                Builder.Add(Shell, Face.Face)
-                pass
-            pass
-        
-        return cls.FromShell(Shell)
+        #Builder=BRep_Builder();
+        #Shell=TopoDS_Shell();
+        #Builder.MakeShell(Shell);
+        #for FaceList in FaceLists:
+        #    for Face in FaceList:  # Face is a LayerBodyFace
+        #        Builder.Add(Shell, Face.Face)
+        #        pass
+        #    pass
 
+        !!!!****
+        # Use BRepFeat_Gluer https://www.opencascade.com/doc/occt-6.9.1/refman/html/class_b_rep_feat___gluer.html
+        # iterating over pairs of faces in the face list, finding shared wire edges,
+        # gluing those two components, then repeat with those two merged,
+        # hopfully accommodating any components that won't merge.
+        
+        # OCC.BRepFeat.BRepFeat_Gluer
+        
+        ## Remove unnecessary internal edges
+        #Fuser = BRepLib_FuseEdges(Shell);
+        #Fuser.Perform();
+
+        OCC.BRepFeat.BRepFeat_Gluer()
+        
+        #return cls.FromShell(Shell)
+        return cls.FromShell(Fuser.Shape())
     
     pass
 

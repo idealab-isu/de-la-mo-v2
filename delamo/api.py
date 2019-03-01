@@ -1676,7 +1676,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         pass
     
 
-    face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,defaultBC,bc_map={ "CONTACT": delamBC, "NONE": delamRingBC })
+    face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
     
 
     # Can not bond non-existant objects
