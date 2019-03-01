@@ -335,9 +335,6 @@ class Layer(object):
         if not solidMaker.IsDone():
             raise ValueError("Solid maker failed")
 
-        #sys.modules["__main__"].__dict__.update(globals())
-        #sys.modules["__main__"].__dict__.update(locals())
-        #raise ValueError("Break")
         solidShape = solidMaker.Solid()
         
         if not BRepLib.breplib_OrientClosedSolid(solidShape):

@@ -20,6 +20,8 @@ from OCC import BRepLib
 from OCC import BRepOffsetAPI
 from OCC import BRepOffset
 from OCC import BRepBuilderAPI
+from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
 #from OCC.BRepClass import BRepClass_FacePassiveClassifier
 from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
@@ -45,11 +47,14 @@ from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
 from OCC.GEOMAlgo import GEOMAlgo_Splitter
 from OCC import GeomProjLib
+from OCC.TColgp import TColgp_Array1OfPnt
+from OCC.TColgp import TColgp_HArray1OfPnt
+from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
 
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
 from OCC.STEPControl import STEPControl_ManifoldSolidBrep
-from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel
+from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel,STEPControl_GeometricCurveSet
 
 from layer import LayerBody,LayerBodyFace
 
@@ -102,6 +107,7 @@ class OCCModelBuilder(object):
         
         
         # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
+
         Projections = [ GeomProjLib.geomprojlib_Project(edge_curve[0],surface) for edge_curve in edge_curves ]
 
         # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
@@ -257,46 +263,38 @@ class OCCModelBuilder(object):
             if delam_outlist[0] != delam_outlist[-1]:
                 raise ValueError("Delamination outline from %s does not form a closed wire (first and last vertices do not match)" % (delam_outline))
             
-            commented = r"""
-            # Create wire from delam_outlist
-            WireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
-            last_point = gp_Pnt(delam_outlist[-2][0],delam_outlist[-2][1],delam_outlist[-2][2])  # -2 because this is the last unique point -- as distinct from the last entry which matches the first entry 
-            last_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(last_point).Vertex()
-            previous_point = last_point
-            previous_vertex = last_vertex
-            for pos in range(len(delam_outlist)-1): # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments 
-                if pos == len(delam_outlist)-1:
-                    current_point = last_point
-                    current_vertex = last_vertex                    
-                    pass
-                else:
-                    current_point = gp_Pnt(delam_outlist[pos][0],delam_outlist[pos][1],delam_outlist[pos][2])
-                    current_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(current_point).Vertex()
-                    pass
+            # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
+            delam_outpointsHArray = TColgp_HArray1OfPnt(1, len(delam_outlist))
 
-                linedir = gp_Dir(gp_Vec(previous_point,current_point))
-                curve=Geom_Line(previous_point,linedir)
-                
-                current_edge_builder = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(curve.GetHandle(), previous_vertex,current_vertex)
-                current_edge=current_edge_builder.Edge()
-                WireBuilder.Add(current_edge)
-
-                previous_point = current_point
-                previous_vertex = current_vertex
-                pass
-            WireShape = WireBuilder.Wire()
-            """
-
-            PolyBuilder = BRepBuilderAPI.BRepBuilderAPI_MakePolygon()
-            for pos in range(len(delam_outlist)-1): # If there are n entries in
+            for pos in range(len(delam_outlist)):
                 current_point = gp_Pnt(delam_outlist[pos][0],delam_outlist[pos][1],delam_outlist[pos][2])
-                current_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(current_point).Vertex()
-                PolyBuilder.Add(current_vertex)
+                delam_outpointsHArray.SetValue(pos+1, current_point)
                 pass
-            PolyBuilder.Close()
-            WireShape=PolyBuilder.Wire()
-            
+
+            # Interpolate the points to make a closed curve
+            interpAPI = GeomAPI_Interpolate(delam_outpointsHArray.GetHandle(), False, self.PointTolerance)
+            interpAPI.Perform()
+            if interpAPI.IsDone():
+                 delam_out_curve = interpAPI.Curve()
+            else:
+                raise ValueError("Curve interpolation failed\n")
+
+            # Convert a curve to edge and then to Shape
+            delam_out_edge = BRepBuilderAPI_MakeEdge(delam_out_curve).Edge()
+            WireBuilder = BRepBuilderAPI_MakeWire()
+            WireBuilder.Add(delam_out_edge)
+            WireShape = WireBuilder.Shape()
             assert(WireShape.Closed())
+
+            # step_writer2=STEPControl_Writer()
+            # step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
+            # step_writer2.Write("../data/Wire.STEP")
+            #
+            # sys.modules["__main__"].__dict__.update(globals())
+            # sys.modules["__main__"].__dict__.update(locals())
+            # raise ValueError("Break")
+
+            # Loading WireShape directly from a STEP file
             #WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
 
             exp=TopExp_Explorer(WireShape,TopAbs_EDGE)
@@ -304,25 +302,18 @@ class OCCModelBuilder(object):
             # Iterate over all edges
             edge_shapes=[]
             while exp.More():
-                edge_shapes.append(exp.Current())
-                
-                exp.Next()
-                pass
+               edge_shapes.append(exp.Current())
 
-            
-            
+               exp.Next()
+               pass
             edge_edges = [ topods_Edge(edge_shape) for edge_shape in edge_shapes ]
 
-            
-
-            # layerbodyface
-            
+            # Offset Face in both directions to create new faces for projection
             (bounding_face_a,bounding_face_b) = self.OffsetFaceInBothDirections(layerbodyface.Face)
             
             ProjectionEdges_a = self.ProjectEdgesOntoFace(edge_edges,bounding_face_a)
             ProjectionEdges_b = self.ProjectEdgesOntoFace(edge_edges,bounding_face_b)
 
-        
             # Generate faces connecting original and projected edges.
             # We will use this as a tool to do the cut. 
             
@@ -378,9 +369,9 @@ class OCCModelBuilder(object):
         
         # step_writer2=STEPControl_Writer()
         # step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        # step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
+        # #step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
         # #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
-        # step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
+        # #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
         # step_writer2.Write("../data/allShapes.STEP")
 
         split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
@@ -563,13 +554,14 @@ if __name__=="__main__":
     MB=OCCModelBuilder(PointTolerance=1e-5,NormalTolerance=1e-6)
     
     Mold = layer.LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
+    #Mold = layer.LayerMold.FromFile(os.path.join("..","data","FlatMold3.STEP"))
     Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
     #Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"ORIG",1e-6)
     Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
     #Layer2=layer.Layer.CreateFromMold("Layer 2",Mold,2.0,"OFFSET",1e-6)
 
     #delaminationlist = [ ]
-    delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv") ]
+    delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
 
     #defaultBCType = 2
     #FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
