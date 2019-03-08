@@ -663,16 +663,16 @@ class LayerMold(object):
         # should already share edges and vertices, we should be able to use BRep_Builder.
         # ... if this fails then could maybe try BRepOffsetAPI_Sewing
 
-        #Builder=BRep_Builder();
-        #Shell=TopoDS_Shell();
-        #Builder.MakeShell(Shell);
-        #for FaceList in FaceLists:
-        #    for Face in FaceList:  # Face is a LayerBodyFace
-        #        Builder.Add(Shell, Face.Face)
-        #        pass
-        #    pass
+        Builder=BRep_Builder();
+        Shell=TopoDS_Shell();
+        Builder.MakeShell(Shell);
+        for FaceList in FaceLists:
+            for Face in FaceList:  # Face is a LayerBodyFace
+                Builder.Add(Shell, Face.Face)
+                pass
+            pass
 
-        !!!!****
+        #!!!!****
         # Use BRepFeat_Gluer https://www.opencascade.com/doc/occt-6.9.1/refman/html/class_b_rep_feat___gluer.html
         # iterating over pairs of faces in the face list, finding shared wire edges,
         # gluing those two components, then repeat with those two merged,
@@ -684,10 +684,10 @@ class LayerMold(object):
         #Fuser = BRepLib_FuseEdges(Shell);
         #Fuser.Perform();
 
-        OCC.BRepFeat.BRepFeat_Gluer()
+        #BRepFeat.BRepFeat_Gluer()
         
-        #return cls.FromShell(Shell)
-        return cls.FromShell(Fuser.Shape())
+        return cls.FromShell(Shell)
+        #return cls.FromShell(Fuser.Shape())
     
     pass
 

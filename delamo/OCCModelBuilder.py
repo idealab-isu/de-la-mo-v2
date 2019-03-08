@@ -417,7 +417,7 @@ class OCCModelBuilder(object):
             del DelamLayerBody.FaceListOrig[DelamLayerBody.FaceListOrig.index(layerbodyface)]
             # Add new faces
             for split_layerbodyface in split_layerbodyfaces:
-                DelamLayerBody.FaceListOffset.append(split_layerbodyface)
+                DelamLayerBody.FaceListOrig.append(split_layerbodyface)
                 pass
             pass
 

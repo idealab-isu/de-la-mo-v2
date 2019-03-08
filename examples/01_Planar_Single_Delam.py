@@ -136,6 +136,7 @@ FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
 
 # Create 3rd layer
 layer3 = Layer.CreateFromMold(DM,layer2.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_3",LaminaSection,45,coordsys=coordsys)
+
 layer3.Finalize(DM)
 layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
@@ -152,7 +153,6 @@ FixedPoint[2]+=thickness
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
                    region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
-
 
 # Create 4th layer 
 layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_4",LaminaSection,90,coordsys=coordsys)
