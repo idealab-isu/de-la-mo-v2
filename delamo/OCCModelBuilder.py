@@ -190,6 +190,20 @@ class OCCModelBuilder(object):
         Return a dictionary indexed by the common faces from layerbody1 that 
         identifies the corresponding faces from layerbody2"""
 
+        # Right now we use equivalent surface geometry to determine equality of faces
+        # this is NOT adequate.
+        #
+        # What we need is:
+        #   * Equality comes from same surface, with same number of edges, where edges
+        #     come from same wires, with same vertices.
+        # Moreover:
+        #   * If the geometry is equivalent, but the faces are not, then we may need
+        #     to do an imprint.
+        #   * One possibility is to attempt to imprint all faces of layerbody1 onto
+        #     all faces of layerbody2 with the same underlying geometry, then
+        #     vice-versa, then match up those common faces. 
+        #     
+
         FaceListTotal1 = layerbody1.FaceListOrig + layerbody1.FaceListOffset + layerbody1.FaceListSide
         FaceListTotal2 = layerbody2.FaceListOrig + layerbody2.FaceListOffset + layerbody2.FaceListSide
         
@@ -199,7 +213,7 @@ class OCCModelBuilder(object):
                 face2=FaceListTotal2[FaceListTotal2.index(face1)]
 
                 # Note that face1 and face2 pass equality (== operator) because
-                # equality operator identifices equivalent geometry. But the face1 and
+                # equality operator identifies equivalent geometry. But the face1 and
                 # face2 objects are actually different!
                 
                 CommonFaces[face1]=face2
