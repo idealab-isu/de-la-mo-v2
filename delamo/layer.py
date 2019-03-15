@@ -1,6 +1,7 @@
 import sys
 import os
 import os.path
+import csv
 
 import numpy as np
 import math
@@ -15,7 +16,10 @@ from OCC.TopoDS import TopoDS_Vertex
 from OCC.TopoDS import TopoDS_Shell
 from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
+from OCC.TopoDS import topods_Edge
 from OCC.BRep import BRep_Builder
+from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
 from OCC.BRep import BRep_Tool
 from OCC.BRepExtrema import BRepExtrema_DistShapeShape
 from OCC import BRepLib
@@ -47,6 +51,12 @@ from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
 from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
+from OCC.GEOMAlgo import GEOMAlgo_Splitter
+from OCC import GeomProjLib
+from OCC.TColgp import TColgp_Array1OfPnt
+from OCC.TColgp import TColgp_HArray1OfPnt
+from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
+
 
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
@@ -58,6 +68,37 @@ from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
 import loaders
 
+
+def ProjectEdgesOntoFace(edge_edges, face):
+    edge_curves = [BRep_Tool.Curve(edge) for edge in edge_edges]
+
+    surface = BRep_Tool.Surface(face)
+
+    # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
+
+    Projections = [GeomProjLib.geomprojlib_Project(edge_curve[0], surface) for edge_curve in edge_curves]
+
+    # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
+    # But it's probably OK not to, because we are using the projection to make a tool that will be used to cut the face
+    # and the extension of the tool beyond the face boundary shouldn't cause any problems, at least so long as thath
+    # geometry doesn't get too weird
+
+    ProjectionEdges = [BRepBuilderAPI.BRepBuilderAPI_MakeEdge(Projection).Edge() for Projection in Projections]
+
+    # If we did trimmming, we would need to construct wire from the edge(s) that actually projected to something within the face,
+    # with any gaps filled by appropriately trimmed edges from the face.
+
+    # ProjectedWireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+    #
+    # for ProjectionEdge in ProjectionEdges:
+    #    ProjectedWireBuilder.add(ProjectionEdge)
+    #    pass
+    #
+    # ProjectedWire = ProjectedWireBuilder.Wire()
+
+    # Need to take ProjectionEdges, which are located on layerbodysurface1
+    # and perform a offset from the surface
+    return ProjectionEdges
 
 # Parametric space search start location for FindOCCPointNormal()
 FindOCCPointNormal_refParPoint = np.array([0.05,0.1])
@@ -211,7 +252,148 @@ class Layer(object):
         from this layer!) """
         return LayerMold.FromFaceLists([ Body.FaceListOrig for Body in self.BodyList ])
 
-    
+    def SplitLayer(self, crackWireFile, Tolerance):
+        """Split the layer using the crackWire outline"""
+
+        SideShapes=[]
+        # Load the CSV file of the splitting line and create a face between the ORIG and OFFSET faces of the layer
+        crack_wire_pt_list = []
+        with open(crackWireFile) as csvfile:
+            reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+            for row in reader:
+                if len(row) != 3:
+                    raise ValueError("Malformed row in CSV file %s: %s" % (crackWireFile, ",".join(row)))
+                try:
+                    x = float(row[0])
+                    y = float(row[1])
+                    z = float(row[2])
+                    crack_wire_pt_list.append((x, y, z))
+                    pass
+                except ValueError:
+                    pass
+                pass
+            pass
+
+        if len(crack_wire_pt_list) == 0:
+            raise ValueError("Could not parse any lines from CSV file %s" % (crackWireFile))
+
+        # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
+        crack_wirepointsHArray = TColgp_HArray1OfPnt(1, len(crack_wire_pt_list))
+
+        for pos in range(len(crack_wire_pt_list)):
+            current_point = gp_Pnt(crack_wire_pt_list[pos][0], crack_wire_pt_list[pos][1], crack_wire_pt_list[pos][2])
+            crack_wirepointsHArray.SetValue(pos + 1, current_point)
+            pass
+
+        # Interpolate the points to make a closed curve
+        interpAPI = GeomAPI_Interpolate(crack_wirepointsHArray.GetHandle(), False, Tolerance)
+        interpAPI.Perform()
+        if interpAPI.IsDone():
+            crack_curve = interpAPI.Curve()
+        else:
+            raise ValueError("Curve interpolation failed\n")
+
+        # Convert a curve to edge and then to Shape
+        crack_edge = BRepBuilderAPI_MakeEdge(crack_curve).Edge()
+        WireBuilder = BRepBuilderAPI_MakeWire()
+        WireBuilder.Add(crack_edge)
+        CrackWireShape = WireBuilder.Shape()
+
+        # step_writer2=STEPControl_Writer()
+        # step_writer2.Transfer(CrackWireShape,STEPControl_GeometricCurveSet,True)
+        # step_writer2.Write("../data/Wire.STEP")
+        #
+        # sys.modules["__main__"].__dict__.update(globals())
+        # sys.modules["__main__"].__dict__.update(locals())
+        # raise ValueError("Break")
+
+        exp = TopExp_Explorer(CrackWireShape, TopAbs_EDGE)
+
+        # Iterate over all edges
+        edge_shapes = []
+        while exp.More():
+            edge_shapes.append(exp.Current())
+
+            exp.Next()
+            pass
+        edge_edges = [topods_Edge(edge_shape) for edge_shape in edge_shapes]
+
+
+        # For now assume only one layer body.
+        # Get the offset and orig faces of the layer body and project the edge to both
+        offsetFace = self.BodyList[0].FaceListOffset[0].Face
+        origFace = self.BodyList[0].FaceListOrig[0].Face
+
+        ProjectionEdges_a = ProjectEdgesOntoFace(edge_edges, origFace)
+        ProjectionEdges_b = ProjectEdgesOntoFace(edge_edges, offsetFace)
+
+        # Generate faces connecting original and offset projected edges.
+        # We will use this as a tool to do the cut.
+
+        # For the moment assume only one edge
+
+        build = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+        Perimeter = TopoDS_Compound()
+        build.MakeCompound(Perimeter)
+
+        wire_a = TopoDS_Wire()
+        build.MakeWire(wire_a)
+        wire_b = TopoDS_Wire()
+        build.MakeWire(wire_b)
+
+        for edgecnt in range(len(edge_edges)):
+            projectionedge_a = ProjectionEdges_a[edgecnt]
+            projectionedge_b = ProjectionEdges_b[edgecnt]
+
+            build.Add(wire_a, projectionedge_a)
+            build.Add(wire_b, projectionedge_b)
+            pass
+
+        # Generate side faces
+        SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
+        SideGenerator.AddWire(wire_a)
+        SideGenerator.AddWire(wire_b)
+        SideGenerator.Build()
+
+        if (not SideGenerator.IsDone()):
+            raise ValueError("Side face generation failed\n")
+
+        SideShape = SideGenerator.Shape()
+
+        build.Add(Perimeter, SideShape)
+        SideShapes.append(SideShape)
+        pass
+
+        GASplitter = GEOMAlgo_Splitter()
+        GASplitter.AddArgument(self.BodyList[0].Shape)
+        for SideShape in SideShapes:
+            GASplitter.AddTool(SideShape)
+            pass
+
+        GASplitter.Perform()
+
+        # if (not GASplitter.IsDone()):
+        #    raise ValueError("Splitting face failed\n")
+
+        SplitBody = GASplitter.Shape()
+        # Hopefully this did not damage layerbodyface
+
+        step_writer2=STEPControl_Writer()
+        step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        step_writer2.Transfer(SplitBody,STEPControl_ManifoldSolidBrep,True)
+        step_writer2.Write("../data/allShapes.STEP")
+
+
+
+
+
+
+
+    pass
+
+
     @classmethod
     def CreateFromMold(cls,Name,Mold,Thickness,Direction,Tolerance):
         """Create a layer from a LayerMold."""
@@ -812,9 +994,13 @@ class LayerBodyFace(object): # Formerly LayerSurface
 
     
 if __name__=="__main__":
-    Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
-    Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
-    Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
+
+    pointTolerance = 1e-6
+    Mold = LayerMold.FromFile(os.path.join("..","data","FlatMold3.STEP"))
+    Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",pointTolerance)
+    Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",pointTolerance)
+
+    Layer1.SplitLayer(os.path.join("..","data","SplitLine.csv"), pointTolerance)
 
     step_writer=STEPControl_Writer()
     
