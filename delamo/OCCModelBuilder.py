@@ -409,34 +409,28 @@ class OCCModelBuilder(object):
         # Need to create a new layerbody with the original layerbodyfaces except for this one, and two new layerbodyfaces
 
 
-        # Create a new layerbody with the split face
-        DelamLayerBody = copy.copy(layerbody)  # non-deep copy
-        # in the copy we are initializing, assign the face lists with
-        # the face we are replacing removed, and with the new faces
-        # we have created, added.
+        # Modify layerbody in-place
 
-        DelamLayerBody.FaceListOrig = layerbody.FaceListOrig
-        if layerbodyface in DelamLayerBody.FaceListOrig:
+        if layerbodyface in layerbody.FaceListOrig:
             # Remove original face
             print("Removing original face from orig side")
-            del DelamLayerBody.FaceListOrig[DelamLayerBody.FaceListOrig.index(layerbodyface)]
+            del layerbody.FaceListOrig[layerbody.FaceListOrig.index(layerbodyface)]
             # Add new faces
             for split_layerbodyface in split_layerbodyfaces:
-                DelamLayerBody.FaceListOrig.append(split_layerbodyface)
+                layerbody.FaceListOrig.append(split_layerbodyface)
                 pass
             pass
-
-        DelamLayerBody.FaceListOffset = layerbody.FaceListOffset
-        if layerbodyface in DelamLayerBody.FaceListOffset:
+        
+        if layerbodyface in layerbody.FaceListOffset:
             # Remove offset face
             print("Removing original face from offset side")
-            del DelamLayerBody.FaceListOffset[DelamLayerBody.FaceListOffset.index(layerbodyface)]
+            del layerbody.FaceListOffset[layerbody.FaceListOffset.index(layerbodyface)]
             # Add new faces
             for split_layerbodyface in split_layerbodyfaces:
-                DelamLayerBody.FaceListOffset.append(split_layerbodyface)
+                layerbody.FaceListOffset.append(split_layerbodyface)
                 pass
             pass
-
+        
         
 
         # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
@@ -447,7 +441,7 @@ class OCCModelBuilder(object):
         #sys.modules["__main__"].__dict__.update(locals())
         #raise ValueError("Break")
 
-        DelamLayerBody._Initializing_Layerbody_Construct_Shape()
+        layerbody.Rebuild_Shape()
         
 
         #step_writer = STEPControl_Writer()
@@ -459,7 +453,7 @@ class OCCModelBuilder(object):
         # (so actual content of this function should be abstracted into
         # a new function we can call twice). 
 
-        return DelamLayerBody
+        return 
 
     def apply_delaminations(self,layer1,layer2,delaminationlist):
         """Iterate over the layerbodies of layer1 and layer2. For each pair of layerbodies, 
@@ -479,12 +473,10 @@ class OCCModelBuilder(object):
 
                 for CommonFace in CommonFaces:
                     #print ("Imprinting delaminations onto CommonFace %s" % (str(CommonFace)))
-                    replacement_lb1=self.imprint_delaminations(lb1,CommonFace,delaminationlist)
+                    self.imprint_delaminations(lb1,CommonFace,delaminationlist)
                     #print ("Imprinting delaminations onto CommonFaces[CommonFace] %s" % (str(CommonFaces[CommonFace])))
-                    replacement_lb2=self.imprint_delaminations(lb2,CommonFaces[CommonFace],delaminationlist)
-                    layer1.BodyList[lb1cnt]=replacement_lb1
-                    layer2.BodyList[lb2cnt]=replacement_lb2
-                    raise ValueError("test")
+                    self.imprint_delaminations(lb2,CommonFaces[CommonFace],delaminationlist)
+                    #raise ValueError("test")
                     pass
 
                 pass

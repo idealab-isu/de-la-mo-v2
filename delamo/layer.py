@@ -612,18 +612,13 @@ class LayerBody(object):
     from a shell which in turn consists of many faces. It represents
     a portion of a layer or stiffener.
 
-    !!!***** *NEED TO CHANGE LayerBody to be Mutable to be 
-    isomorphic to the delamo.api.Part or delamo.api.LayerPart
-
     ** MAYBE should make this derive from "Body" class 
     that just has a single list of all faces. 
 
-    Value semantics: The LayerBody is immutable once created. If 
-    there is a need to change it, create a new LayerBody, being
-    sure to deep copy anything being changed, and remove the 
-    old LayerBod(ies) from the owning Layer. The FaceLists will 
-    in general need to be re-created with their owners pointing
-    to the new LayerBody
+    Object semantics: The LayerBody is mutable once created. But
+    the faces and shape from which it is construct are not mutable
+    and may need to be regenerated when the LayerBody is modified.  
+
 """
     Name = None
     FaceListOrig=None # Faces on the "ORIG" side (LayerBodyFace)
@@ -649,9 +644,8 @@ class LayerBody(object):
             pass
         pass
 
-    def _Initializing_Layerbody_Construct_Shape(self):
+    def Rebuild_Shape(self):
         # Build/rebuild the .Shape attribute from the Face Lists: FaceListOrig, FaceListOffset, and FaceListSide
-        # SHOULD ONLY BE CALLED DURING INITIALIZATION OF A NEW LayerBody (as LayerBody is generally supposed to be immutable)
 
         # Now we have to sew all of these pieces together
         # (with a thread!)
