@@ -202,7 +202,11 @@ class OCCModelBuilder(object):
         #   * One possibility is to attempt to imprint all faces of layerbody1 onto
         #     all faces of layerbody2 with the same underlying geometry, then
         #     vice-versa, then match up those common faces. 
-        #     
+        #   * Better option: See case #12 from 
+        #     https://www.opencascade.com/doc/occt-7.0.0/overview/html/occt_user_guides__boolean_operations.html#occt_algorithms_9_4_12
+        #     (fuse operations cause imprinting) so if we simply try to fuse the faces 
+        #     with common geometry from both sides. The outcome should include all faces
+        #     imprinted        
 
         FaceListTotal1 = layerbody1.FaceListOrig + layerbody1.FaceListOffset + layerbody1.FaceListSide
         FaceListTotal2 = layerbody2.FaceListOrig + layerbody2.FaceListOffset + layerbody2.FaceListSide

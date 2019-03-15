@@ -386,7 +386,13 @@ class Layer(object):
         step_writer2.Write("../data/allShapes.STEP")
 
 
-
+        # !!!*** Need to create two layerbodies, replacing the existing layerbody in the
+        # layer structure. Need to generate and sort LayerBodyFaces into all of the right places. 
+        #
+        # !!!*** Need API to provide points for a wire segment to do the splitting, 
+        # Need to connect the wire segment to the domain boundary
+        # Need to bond the region between segment and boundary
+        
 
 
 
@@ -407,7 +413,9 @@ class Layer(object):
         else:
             raise ValueError("Invalid Direction: %s" % (str(Direction)))
 
-        
+        # !!!*** When doing the offset operation
+        # Should attempt to heal or merge split faces that share the same 
+        # underlying geometry. How??? 
         
         mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(Mold.Shape, OffsetDist, Tolerance,
                                                                BRepOffset.BRepOffset_Skin,
