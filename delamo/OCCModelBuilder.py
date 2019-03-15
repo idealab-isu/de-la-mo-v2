@@ -379,9 +379,12 @@ class OCCModelBuilder(object):
         numsplitfaces = 0
         split_face_shapes=[]
         split_layerbodyfaces=[]
+        step_writer = STEPControl_Writer()
+
         while split_face_exp.More():
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
+            step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
 
             split_face = topods_Face(split_face_shape)
             (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
@@ -398,6 +401,7 @@ class OCCModelBuilder(object):
 
             split_face_exp.Next()
             pass
+        step_writer.Write("/tmp/split_faces.step")
 
         print("Number of split faces %d"%(numsplitfaces))
 
@@ -414,6 +418,7 @@ class OCCModelBuilder(object):
         DelamLayerBody.FaceListOrig = layerbody.FaceListOrig
         if layerbodyface in DelamLayerBody.FaceListOrig:
             # Remove original face
+            print("Removing original face from orig side")
             del DelamLayerBody.FaceListOrig[DelamLayerBody.FaceListOrig.index(layerbodyface)]
             # Add new faces
             for split_layerbodyface in split_layerbodyfaces:
@@ -424,6 +429,7 @@ class OCCModelBuilder(object):
         DelamLayerBody.FaceListOffset = layerbody.FaceListOffset
         if layerbodyface in DelamLayerBody.FaceListOffset:
             # Remove offset face
+            print("Removing original face from offset side")
             del DelamLayerBody.FaceListOffset[DelamLayerBody.FaceListOffset.index(layerbodyface)]
             # Add new faces
             for split_layerbodyface in split_layerbodyfaces:
@@ -472,10 +478,13 @@ class OCCModelBuilder(object):
                 CommonFaces=self.eval_face_pairs(lb1,lb2)
 
                 for CommonFace in CommonFaces:
+                    #print ("Imprinting delaminations onto CommonFace %s" % (str(CommonFace)))
                     replacement_lb1=self.imprint_delaminations(lb1,CommonFace,delaminationlist)
+                    #print ("Imprinting delaminations onto CommonFaces[CommonFace] %s" % (str(CommonFaces[CommonFace])))
                     replacement_lb2=self.imprint_delaminations(lb2,CommonFaces[CommonFace],delaminationlist)
                     layer1.BodyList[lb1cnt]=replacement_lb1
                     layer2.BodyList[lb2cnt]=replacement_lb2
+                    raise ValueError("test")
                     pass
 
                 pass

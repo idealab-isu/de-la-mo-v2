@@ -232,9 +232,9 @@ class Layer(object):
                                                                False, False,
                                                                GeomAbs_Arc)
 
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(Mold.Shape,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer2.Write("/tmp/OffsetFace.step")
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(Mold.Shape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Write("/tmp/OffsetFace.step")
 
         assert (mkOffset.IsDone())
 
@@ -429,6 +429,12 @@ class LayerBody(object):
     """ The LayerBody is a solid, defined as a boundary representation
     from a shell which in turn consists of many faces. It represents
     a portion of a layer or stiffener.
+
+    !!!***** *NEED TO CHANGE LayerBody to be Mutable to be 
+    isomorphic to the delamo.api.Part or delamo.api.LayerPart
+
+    ** MAYBE should make this derive from "Body" class 
+    that just has a single list of all faces. 
 
     Value semantics: The LayerBody is immutable once created. If 
     there is a need to change it, create a new LayerBody, being
