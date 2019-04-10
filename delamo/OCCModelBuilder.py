@@ -208,6 +208,24 @@ class OCCModelBuilder(object):
         #     with common geometry from both sides. The outcome should include all faces
         #     imprinted        
 
+        # we are going to modify eval_face_pairs into match_face_pairs
+        # that will imprint faces from lb1 onto lb2 and vice versa,
+        # and then return a dictionary indexed by the face in lb1
+        # of the corresponding imprinted face in lb2
+        #
+        # It will do this by first comparing geometry, then
+        # doing a rigorous equality comparison via edges and vertices (as described above)
+        # taking all faces from layerbody1 that share and underlying surface with layerbody2
+        # and all of those faces from layerbody2, Then performing a fuse operation, yielding 
+        # a large number of pieces. Reconstruct layerbodies 1 and 2 from the correct
+        # subpieces. A correct subpiece is one that, given a non-boundary point on the subpiece,
+        # the point lies inside a pre-existing face of that layerbody
+        #
+        # Then the correct subpieces can be sewn back together into the layerbody,
+        # and the face lists updates accordingly.
+        #
+        # Finally matched surface pairs can be returned. 
+        
         FaceListTotal1 = layerbody1.FaceListOrig + layerbody1.FaceListOffset + layerbody1.FaceListSide
         FaceListTotal2 = layerbody2.FaceListOrig + layerbody2.FaceListOffset + layerbody2.FaceListSide
         
@@ -486,7 +504,11 @@ class OCCModelBuilder(object):
 
             for lb2cnt in range(len(layer2.BodyList)):
                 lb2=layer2.BodyList[lb2cnt]
-                
+
+                # !!!*** modify eval_face_pairs into match_face_pairs
+                # that will imprint faces from lb1 onto lb2 and vice versa,
+                # and then return a dictionary indexed by the face in lb1
+                # of the corresponding imprinted face in lb2
                 CommonFaces=self.eval_face_pairs(lb1,lb2)
 
                 for CommonFace in CommonFaces:
