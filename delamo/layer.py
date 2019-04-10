@@ -400,16 +400,70 @@ class Layer(object):
                 pass
             bodyIterator.Next()
 
+        Layer =
 
         # For each body extracted, find the faces and add them to the corresponding list
-        for body in SplitBodyList:
+        for (bodyNum, body) in enumerate(SplitBodyList):
 
+            NewLayerBody = LayerBody(Name="%s_LB%d" % (self.Name,bodyNum),
+                                     Owner=self,
+                                     Shape=body)
 
+            # Extract faces and sort them into NewLayerBody.FaceListOrig, NewLayerBody.FaceListOffset, and NewLayerBody.FaceListSide
 
+            # Iterate over all faces
+            FaceExp = TopExp_Explorer(body, TopAbs_FACE)
+            while FaceExp.More():
+                # Extract the Surface object (geometry, not topology) underlying this face
+                tds_Face = topods_Face(FaceExp.Current())
+                FaceSurf = BRep_Tool.Surface(tds_Face)
 
+                # Search for this face in the mold
+                MatchedInMold = False
+                for MoldFace in Mold.FaceList:  # Iterate over LayerBodyFaces in Mold
+                    MoldFaceSurf = BRep_Tool.Surface(MoldFace.Face)
+                    if MoldFaceSurf == FaceSurf:  # Same underlying surface
+                        if MatchedInMold:
+                            raise ValueError("Same surface matched twice in mold (!?)")
+                        MatchedInMold = True
+                        pass
+                    pass
 
+                # Search for this face in the offset surface
+                MatchedInOffset = False
+                for OffsetFace in OffsetFaces:  # Iterate over LayerBodyFaces in Mold
+                    OffsetFaceSurf = BRep_Tool.Surface(OffsetFace)
+                    if OffsetFaceSurf == FaceSurf:  # Same underlying surface
+                        if MatchedInOffset:
+                            raise ValueError("Same surface matched twice in offset (!?)")
+                        MatchedInOffset = True
+                        pass
+                    pass
 
+                # Since these faces are extracted from the generated
+                # closed object, that the normals generated in FromOCC()
+                # should be outward-facing and thus we don't need to
+                # provide an IsPointingInside lambda.
 
+                if MatchedInMold and not (MatchedInOffset):
+                    # Create LayerBodyFace
+                    NewLayerBody.FaceListOrig.append(LayerBodyFace.FromOCC(tds_Face, "ORIG", Owner=NewLayerBody))
+                    pass
+                elif MatchedInOffset and not (MatchedInMold):
+                    # Create LayerBodyFace
+                    NewLayerBody.FaceListOffset.append(LayerBodyFace.FromOCC(tds_Face, "OFFSET", Owner=NewLayerBody))
+                    pass
+                elif MatchedInOffset and MatchedInMold:
+                    raise ValueError("Same surface matched in both offset and mold (!?)")
+                else:
+                    # Must be a side face
+                    # Create LayerBodyFace
+                    NewLayerBody.FaceListSide.append(LayerBodyFace.FromOCC(tds_Face, "OFFSET", Owner=NewLayerBody))
+                    pass
+                FaceExp.Next()
+                pass
+
+            NewLayer.BodyList.append(NewLayerBody)
 
         sys.modules["__main__"].__dict__.update(globals())
         sys.modules["__main__"].__dict__.update(locals())
