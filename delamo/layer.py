@@ -14,6 +14,7 @@ from OCC.TopoDS import TopoDS_Compound
 from OCC.TopoDS import TopoDS_Wire
 from OCC.TopoDS import TopoDS_Vertex
 from OCC.TopoDS import TopoDS_Shell
+from OCC.TopoDS import TopoDS_Solid
 from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
 from OCC.TopoDS import topods_Edge
@@ -42,10 +43,12 @@ from OCC.TopAbs import TopAbs_FACE
 from OCC.TopAbs import TopAbs_VERTEX
 from OCC.TopAbs import TopAbs_EDGE
 from OCC.TopAbs import TopAbs_SHELL
+from OCC.TopAbs import TopAbs_SOLID
 from OCC.TopAbs import TopAbs_FORWARD
 from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
+from OCC.TopoDS import TopoDS_Iterator
 from OCC.GeomLProp import GeomLProp_SLProps
 from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
@@ -302,10 +305,6 @@ class Layer(object):
         # step_writer2=STEPControl_Writer()
         # step_writer2.Transfer(CrackWireShape,STEPControl_GeometricCurveSet,True)
         # step_writer2.Write("../data/Wire.STEP")
-        #
-        # sys.modules["__main__"].__dict__.update(globals())
-        # sys.modules["__main__"].__dict__.update(locals())
-        # raise ValueError("Break")
 
         exp = TopExp_Explorer(CrackWireShape, TopAbs_EDGE)
 
@@ -375,24 +374,51 @@ class Layer(object):
         # if (not GASplitter.IsDone()):
         #    raise ValueError("Splitting face failed\n")
 
-        SplitBody = GASplitter.Shape()
-        # Hopefully this did not damage layerbodyface
+        SplitBodies = GASplitter.Shape()
 
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
         #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
-        step_writer2.Transfer(SplitBody,STEPControl_ManifoldSolidBrep,True)
-        step_writer2.Write("../data/allShapes.STEP")
+        #step_writer2.Transfer(SplitBodies,STEPControl_ManifoldSolidBrep,True)
+        #step_writer2.Write("../data/allShapes.STEP")
 
 
         # !!!*** Need to create two layerbodies, replacing the existing layerbody in the
         # layer structure. Need to generate and sort LayerBodyFaces into all of the right places. 
-        #
-        # !!!*** Need API to provide points for a wire segment to do the splitting, 
+
+
+        # Extract the bodies created after the split operation
+        bodyIterator = TopoDS_Iterator(SplitBodies)
+        bodyCount = 0
+        SplitBodyList=[]
+        while bodyIterator.More():
+            # Only consider edges
+            if bodyIterator.Value().ShapeType() == TopAbs_SOLID:
+                bodyCount += 1
+                SplitBodyList.append(bodyIterator.Value())
+                pass
+            bodyIterator.Next()
+
+
+        # For each body extracted, find the faces and add them to the corresponding list
+        for body in SplitBodyList:
+
+
+
+
+
+
+
+
+        sys.modules["__main__"].__dict__.update(globals())
+        sys.modules["__main__"].__dict__.update(locals())
+        raise ValueError("Break")
+
+
+        # !!!*** Need API to provide points for a wire segment to do the splitting,
         # Need to connect the wire segment to the domain boundary
         # Need to bond the region between segment and boundary
-        
 
 
 
@@ -910,7 +936,8 @@ class LayerBodyFace(object): # Formerly LayerSurface
     # should be covered by Direction=="ORIG"
     Direction = None # "ORIG", "OFFSET", "SIDE", or "NODIR", representing the side of the Owning LayerBody which corresponds to this Face
 
-    Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part. ****!!!! NOTE: as of 2/8/19, not always updated when we do delamination splits!!!***
+    Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part.
+    # ****!!!! NOTE: as of 2/8/19, not always updated when we do delamination splits!!!***
     
     BCType = None # Formerly DelaminationType: None, "NODELAM" "NOMODEL", "COHESIVE", "CONTACT" or, "TIE"
     # MatchingFace = None # Formerly SurfPair, This would be the matching LayerBodyFace in the adjacent (or non-adjacent)
@@ -1007,13 +1034,16 @@ if __name__=="__main__":
     Mold = LayerMold.FromFile(os.path.join("..","data","FlatMold3.STEP"))
     Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",pointTolerance)
     Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",pointTolerance)
+    Layer3=Layer.CreateFromMold("Layer 3",Layer2.OffsetMold(),2.0,"OFFSET",pointTolerance)
 
-    Layer1.SplitLayer(os.path.join("..","data","SplitLine.csv"), pointTolerance)
+    Layer2.SplitLayer(os.path.join("..","data","SplitLine.csv"), pointTolerance)
 
     step_writer=STEPControl_Writer()
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Transfer(Layer2.BodyList[1].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Transfer(Layer3.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Write("../Data/Layers.step")
 
     pass
