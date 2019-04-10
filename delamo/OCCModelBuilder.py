@@ -224,7 +224,12 @@ class OCCModelBuilder(object):
         # Then the correct subpieces can be sewn back together into the layerbody,
         # and the face lists updates accordingly.
         #
-        # Finally matched surface pairs can be returned. 
+        # Finally matched surface pairs can be returned.
+
+        # So maybe there is still and eval_face_pairs that assumes
+        # and checks that faces are properly imprinted against each
+        # other and the match_face_pairs performs necessary imprints,
+        # then calls eval_face_pairs
         
         FaceListTotal1 = layerbody1.FaceListOrig + layerbody1.FaceListOffset + layerbody1.FaceListSide
         FaceListTotal2 = layerbody2.FaceListOrig + layerbody2.FaceListOffset + layerbody2.FaceListSide
