@@ -549,36 +549,112 @@ class OCCModelBuilder(object):
 
         # ASSUMPTION: layer1 offset faces are fused to layer 2 orig faces
 
-        layer1FaceList = TopTools_ListOfShape()
-        layer2FaceList = TopTools_ListOfShape()
+        #layer1FaceList = TopTools_ListOfShape()
+        #layer2FaceList = TopTools_ListOfShape()
+
+        layer1FaceList=[]
+        layer2FaceList=[]
         for LB in layer1.BodyList:
-            for LayerBodyFaceList in [ LB.FaceListOffset ]: # LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side? 
-                for LayerBodyFace in LayerBodyFaceList:
-                    layer1FaceList.Append(LayerBodyFace.Face)
-                    pass
+            for LayerBodyFaceList in [ LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side?
+                layer1FaceList.extend(LayerBodyFaceList)
+                #for LayerBodyFace in LayerBodyFaceList:
+                #    layer1FaceList.Append(LayerBodyFace.Face)
+                #    pass
                 pass
             pass
 
         for LB in layer2.BodyList:
-            for LayerBodyFaceList in [ LB.FaceListOrig]: # LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side? 
-                for LayerBodyFace in LayerBodyFaceList:
-                    layer2FaceList.Append(LayerBodyFace.Face)
-                    pass
+            for LayerBodyFaceList in [ LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side? 
+                layer2FaceList.extend(LayerBodyFaceList)
+                #for LayerBodyFace in LayerBodyFaceList:
+                #    layer2FaceList.Append(LayerBodyFace.Face)
+                #    pass
                 pass            
             pass
+
+        # Find faces with matched underlying surfaces...
+        # (This can potentially be eliminated but it will
+        # make the operation very slow)
+
+        FusedFaces=[]
+        
+        SurfaceDict1={}
+        for face in layer1FaceList:
+            # OpenCascade surface provides a DumpToString method
+            # that gives a (presumably unique) identification of the
+            # underlying surface. The string is hashable, so usable
+            # as a dictionary key
+            key = BRep_Tool().Surface(face.Face).DumpToString()
+
+            if key not in SurfaceDict1:
+                SurfaceDict1[key]=[]
+                pass
+            
+            SurfaceDict1[key].append(face.Face)
+            pass
+        
+        SurfaceDict2={}
+        for face in layer2FaceList:
+            # OpenCascade surface provides a DumpToString method
+            # that gives a (presumably unique) identification of the
+            # underlying surface. The string is hashable, so usable
+            # as a dictionary key
+            key = BRep_Tool().Surface(face.Face).DumpToString()
+
+            if key not in SurfaceDict2:
+                SurfaceDict2[key]=[]
+                pass
+            
+            SurfaceDict2[key].append(face.Face)
+            pass
+
+        for surfacekey in SurfaceDict1:
+            if surfacekey in SurfaceDict2:
+                # Found surface with faces both in layer 1 and 2
+                layer1surfacefaces = TopTools_ListOfShape()
+                for face in SurfaceDict1[surfacekey]:
+                    layer1surfacefaces.Append(face)
+                    pass
+                
+                layer2surfacefaces = TopTools_ListOfShape()
+                for face in SurfaceDict2[surfacekey]:
+                    layer2surfacefaces.Append(face)
+                    pass
+ 
+                
+                # Fuse operation on all faces.
+                fuser = BRepAlgoAPI_Fuse()
+                fuser.SetArguments(layer1surfacefaces)
+                fuser.SetTools(layer2surfacefaces)
+                fuser.Build()
+                fusedShape = fuser.Shape()
+                FusedFaces.append(fusedShape)
+                pass
+            pass
+
+        # !!!*** Need to sort through fused faces, and use them to
+        # replace faces in layerbodies of layer1 and layer2
+        # based on finding identification for the new faces and
+        # testing whether that identification works on old faces.
+        # ... Then replace the old faces with identified new faces.
+        
         
         #fuser = BRepAlgoAPI_Fuse(layer1OffsetFaceList[0].Face, layer2OrigFaceList[0].Face)
-        fuser = BRepAlgoAPI_Fuse()
-        fuser.SetArguments(layer1FaceList)
-        fuser.SetTools(layer2FaceList)
-        fuser.Build()
-        fusedShape = fuser.Shape()
+        #fuser = BRepAlgoAPI_Fuse()
+        #fuser.SetArguments(layer1FaceList)
+        #fuser.SetTools(layer2FaceList)
+        #fuser.Build()
+        #fusedShape = fuser.Shape()
         
 
         step_writer=STEPControl_Writer()
         #step_writer.Transfer(layer1OffsetFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer.Transfer(layer2OrigFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer.Transfer(fusedShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer.Transfer(fusedShape,STEPControl_ShellBasedSurfaceModel,True)
+        for shape in FusedFaces:
+            step_writer.Transfer(shape,STEPControl_ShellBasedSurfaceModel,True)
+            pass
+        
         step_writer.Write("../data/fusedFace.STEP")
 
         sys.modules["__main__"].__dict__.update(globals())
