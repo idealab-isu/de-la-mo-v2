@@ -40,6 +40,7 @@ from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
 from OCC.Geom import Geom_Line
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
+from OCC.TopTools import TopTools_ListOfShape
 from OCC.GeomLProp import GeomLProp_SLProps
 from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
@@ -548,23 +549,35 @@ class OCCModelBuilder(object):
 
         # ASSUMPTION: layer1 offset faces are fused to layer 2 orig faces
 
-        layer1OffsetFaceList = []
-        layer2OrigFaceList = []
+        layer1FaceList = TopTools_ListOfShape()
+        layer2FaceList = TopTools_ListOfShape()
         for LB in layer1.BodyList:
-            layer1OffsetFaceList.extend(LB.FaceListOffset)
+            for LayerBodyFaceList in [ LB.FaceListOffset ]: # LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side? 
+                for LayerBodyFace in LayerBodyFaceList:
+                    layer1FaceList.Append(LayerBodyFace.Face)
+                    pass
+                pass
             pass
 
         for LB in layer2.BodyList:
-            layer2OrigFaceList.extend(LB.FaceListOrig)
+            for LayerBodyFaceList in [ LB.FaceListOrig]: # LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side? 
+                for LayerBodyFace in LayerBodyFaceList:
+                    layer2FaceList.Append(LayerBodyFace.Face)
+                    pass
+                pass            
             pass
-
-        fuser = BRepAlgoAPI_Fuse(layer1OffsetFaceList[0].Face, layer2OrigFaceList[0].Face)
+        
+        #fuser = BRepAlgoAPI_Fuse(layer1OffsetFaceList[0].Face, layer2OrigFaceList[0].Face)
+        fuser = BRepAlgoAPI_Fuse()
+        fuser.SetArguments(layer1FaceList)
+        fuser.SetTools(layer2FaceList)
+        fuser.Build()
         fusedShape = fuser.Shape()
-
+        
 
         step_writer=STEPControl_Writer()
-        step_writer.Transfer(layer1OffsetFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer.Transfer(layer2OrigFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer.Transfer(layer1OffsetFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer.Transfer(layer2OrigFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
         step_writer.Transfer(fusedShape,STEPControl_ShellBasedSurfaceModel,True)
         step_writer.Write("../data/fusedFace.STEP")
 
