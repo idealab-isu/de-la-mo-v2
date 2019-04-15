@@ -46,6 +46,7 @@ from OCC.gp import gp_Vec
 from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
 from OCC.GEOMAlgo import GEOMAlgo_Splitter
+from OCC.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCC import GeomProjLib
 from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
@@ -230,6 +231,9 @@ class OCCModelBuilder(object):
         # and checks that faces are properly imprinted against each
         # other and the match_face_pairs performs necessary imprints,
         # then calls eval_face_pairs
+
+
+
         
         FaceListTotal1 = layerbody1.FaceListOrig + layerbody1.FaceListOffset + layerbody1.FaceListSide
         FaceListTotal2 = layerbody2.FaceListOrig + layerbody2.FaceListOffset + layerbody2.FaceListSide
@@ -527,13 +531,59 @@ class OCCModelBuilder(object):
                 pass
             pass
         pass
-    
+
+    def imprint_layers(self,layer1,layer2):
+        """ Imprint the layerbodies of layer1 and layer2 onto each other
+        First find all faces that share a common surface
+        Perform Boolean Fuse operation on the faces
+        Sort the faces based on underlying layerbody
+        Reconstruct the layerbody and replace them in the layer
+        """
+        # Reconstruct layerbodies 1 and 2 from the correct
+        # subpieces. A correct subpiece is one that, given a non-boundary point on the subpiece,
+        # the point lies inside a pre-existing face of that layerbody
+        #
+        # Then the correct subpieces can be sewn back together into the layerbody,
+        # and the face lists updates accordingly.
+
+        # ASSUMPTION: layer1 offset faces are fused to layer 2 orig faces
+
+        layer1OffsetFaceList = []
+        layer2OrigFaceList = []
+        for LB in layer1.BodyList:
+            layer1OffsetFaceList.extend(LB.FaceListOffset)
+            pass
+
+        for LB in layer2.BodyList:
+            layer2OrigFaceList.extend(LB.FaceListOrig)
+            pass
+
+        fuser = BRepAlgoAPI_Fuse(layer1OffsetFaceList[0].Face, layer2OrigFaceList[0].Face)
+        fusedShape = fuser.Shape()
+
+
+        step_writer=STEPControl_Writer()
+        step_writer.Transfer(layer1OffsetFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer.Transfer(layer2OrigFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer.Transfer(fusedShape,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer.Write("../data/fusedFace.STEP")
+
+        sys.modules["__main__"].__dict__.update(globals())
+        sys.modules["__main__"].__dict__.update(locals())
+        raise ValueError("Break")
+
+
+
+
+
+        pass
+
     def adjacent_layers(self,layer1,layer2,bc_map=None):
         """ Once adjacent_layers() is called, the LayerBody's in EITHER layer can't be split
         anymore -- because then they might need new names,
         and the return values contain the layer body names that will be used
         to apply the boundary conditions"""
-        
+
         FAL = [] # Face Adjacency List
         
         for lb1 in layer1.BodyList:
@@ -599,25 +649,33 @@ class OCCModelBuilder(object):
 if __name__=="__main__":
     MB=OCCModelBuilder(PointTolerance=1e-5,NormalTolerance=1e-6)
     
+    pointTolerance = 1e-6
     Mold = layer.LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
     #Mold = layer.LayerMold.FromFile(os.path.join("..","data","FlatMold3.STEP"))
-    Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
+    Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",pointTolerance)
     #Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"ORIG",1e-6)
-    Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
+    Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",pointTolerance)
     #Layer2=layer.Layer.CreateFromMold("Layer 2",Mold,2.0,"OFFSET",1e-6)
+    Layer3=layer.Layer.CreateFromMold("Layer 3",Layer2.OffsetMold(),2.0,"OFFSET",pointTolerance)
+
+    Layer2.Split(os.path.join("..","data","SplitLine2.csv"), pointTolerance)
+
 
     #delaminationlist = [ ]
-    delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
+    #delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
 
+    MB.imprint_layers(Layer1, Layer2)
     #defaultBCType = 2
     #FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
-    MB.apply_delaminations(Layer1,Layer2,delaminationlist)
+    #MB.apply_delaminations(Layer1,Layer2,delaminationlist)
 
 
     step_writer=STEPControl_Writer()
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Transfer(Layer2.BodyList[1].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Transfer(Layer3.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Write(os.path.join("..","data","Layers.step"))
 
     pass
