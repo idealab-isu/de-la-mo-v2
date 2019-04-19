@@ -208,6 +208,27 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
              np.array((faceNormal.X(), faceNormal.Y(), faceNormal.Z()), dtype='d'),
              np.array((faceParPoint[0], faceParPoint[1]), dtype='d'))
 
+
+def OCCPointInFace(Point, Face, OrigPointTolerance):
+    """ Given a face and a Point check if point lies on the face"""
+
+    facePoint = gp_Pnt(Point[0],Point[1],Point[2])
+    # faceSurface = BRep_Tool().Surface(Face)
+    # SAS = ShapeAnalysis_Surface(faceSurface)
+    # currentUV = SAS.ValueOfUV(facePoint, OrigPointTolerance)
+    # parPointU = currentUV.X()
+    # parPointV = currentUV.Y()
+    # print(parPointU, parPointV)
+    #
+    FaceExplorer = BRepClass_FaceExplorer(Face)
+    C = BRepClass_FClassifier()
+    # C.Perform(FaceExplorer, gp_Pnt2d(parPointU, parPointV), OrigPointTolerance)
+
+    C.Perform(Face, facePoint, OrigPointTolerance )
+
+    return C.State()
+
+
 class Layer(object):
     """The Layer is a collection of LayerBodies representing 
     a single lamina

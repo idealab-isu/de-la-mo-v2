@@ -59,6 +59,7 @@ from OCC.STEPControl import STEPControl_ManifoldSolidBrep
 from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel,STEPControl_GeometricCurveSet
 
 from layer import LayerBody,LayerBodyFace
+from layer import OCCPointInFace
 
 import loaders
 import layer
@@ -628,34 +629,62 @@ class OCCModelBuilder(object):
                 fuser.SetTools(layer2surfacefaces)
                 fuser.Build()
                 fusedShape = fuser.Shape()
-                FusedFaces.append(fusedShape)
+                # Separate out the faces from the fusedShape and add
+                # to FusedFaces
+
+                topExplorer = TopExp_Explorer(fusedShape, TopAbs_FACE)
+
+                # iterate over pieces of the original wire
+                while topExplorer.More():
+                    FusedFaces.append(topExplorer.Current())
+                    topExplorer.Next()
+                    pass
+
                 pass
             pass
 
-        # !!!*** Need to sort through fused faces, and use them to
+        # !!!*** Need to loop through fused faces, and use them to
         # replace faces in layerbodies of layer1 and layer2
         # based on finding identification for the new faces and
         # testing whether that identification works on old faces.
         # ... Then replace the old faces with identified new faces.
-        
-        
-        #fuser = BRepAlgoAPI_Fuse(layer1OffsetFaceList[0].Face, layer2OrigFaceList[0].Face)
-        #fuser = BRepAlgoAPI_Fuse()
-        #fuser.SetArguments(layer1FaceList)
-        #fuser.SetTools(layer2FaceList)
-        #fuser.Build()
-        #fusedShape = fuser.Shape()
-        
 
-        step_writer=STEPControl_Writer()
+        for faceShape in FusedFaces:
+            layerBodyFace = LayerBodyFace.FromOCC(topods_Face(faceShape),"OFFSET")
+            # Loop through LayerBodies in layer1
+            for LB in layer1.BodyList:
+                # Loop through all faces in each LB
+                for layer1BodyFace in LB.FaceListOrig + LB.FaceListOffset + LB.FaceListSide: # Do we really need side? :
+                    # Check if the reference point from fused face matches any other face
+                    pointClassification = OCCPointInFace(layerBodyFace.Point, layer1BodyFace.Face, self.PointTolerance)
+                    print(pointClassification, TopAbs_IN, TopAbs_OUT, TopAbs_ON)
+                    if (pointClassification == TopAbs_IN):
+                        print("Found a matched face in %s "%layer1BodyFace.Owner.Name)
+                        layerBodyFace.Direction = layer1BodyFace.Direction
+                        layerBodyFace.Owner = layer1BodyFace.Owner
+                        pass
+
+                    pass
+
+                pass
+
+            pass
+
+        pass
+
+
+
+
+
+        #step_writer=STEPControl_Writer()
         #step_writer.Transfer(layer1OffsetFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer.Transfer(layer2OrigFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer.Transfer(fusedShape,STEPControl_ShellBasedSurfaceModel,True)
-        for shape in FusedFaces:
-            step_writer.Transfer(shape,STEPControl_ShellBasedSurfaceModel,True)
-            pass
+        #for shape in FusedFaces:
+        #    step_writer.Transfer(shape,STEPControl_ShellBasedSurfaceModel,True)
+        #    pass
         
-        step_writer.Write("../data/fusedFace.STEP")
+        #step_writer.Write("../data/fusedFace.STEP")
 
         sys.modules["__main__"].__dict__.update(globals())
         sys.modules["__main__"].__dict__.update(locals())
