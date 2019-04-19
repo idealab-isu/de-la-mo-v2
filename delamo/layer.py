@@ -1046,8 +1046,8 @@ class LayerBodyFace(object): # Formerly LayerSurface
     
     BCType = None # Formerly DelaminationType: None, "NODELAM" "NOMODEL", "COHESIVE", "CONTACT" or, "TIE"
     # MatchingFace = None # Formerly SurfPair, This would be the matching LayerBodyFace in the adjacent (or non-adjacent)
-    # layer or stiffener, assigned by adjacent_layers() ... To maintain immutability of these objects suggest that
-    # instead of this attribute, have adjacent_layers() create a dictionary
+    # layer or stiffener, assigned by adjacent_layer_boundary_conditions() ... To maintain immutability of these objects suggest that
+    # instead of this attribute, have adjacent_layer_boundary_conditions() create a dictionary
     # that can be used to look up matching faces. 
 
     # StiffenerGenerated and StiffnerPaired members removed (should no longer be necessary)

@@ -1087,7 +1087,10 @@ layup direction, etc."""
         return cls(name=name,gk_layer=gk_layer,layupdirection=layupdirection,LayerSection=LayerSection,coordsys=coordsys)
 
     def Finalize(self,DM):
-        """Build Python and Finite Element structure for this layer based on geometry kernel structure"""
+        """Build Python and Finite Element structure for this layer based on geometry kernel structure.
+        It is not permissible to break a layer into pieces (multiple parts or bodies) after this 
+        finalize call. It IS permissible to do surface imprints that operate in-place on the existing 
+        layerbodies. """
         assert(self.parts is None) # this will fail if we try to finalize a second time
         self.parts=collections.OrderedDict()
 
@@ -1632,11 +1635,11 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
 
         #import pdb
         #pdb.set_trace()
-        face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,cohesive_layer.gk_layer,gk_delaminationlist,delamo.CADwrap.BC_TIE,delamo.CADwrap.BC_CONTACT,delamo.CADwrap.BC_NONE) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
+        face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,cohesive_layer.gk_layer,gk_delaminationlist,delamo.CADwrap.BC_TIE,delamo.CADwrap.BC_CONTACT,delamo.CADwrap.BC_NONE) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
         # Find delamination region from FAL so cohesive_layer is removed in this region
         for face_adjacency in face_adjacency_list:
             if face_adjacency["bcType"]==delamo.CADwrap.Delamination_NOMODEL or face_adjacency["bcType"]==delamo.CADwrap.Delamination_CONTACT:
-                name_to_remove=face_adjacency["name2"] # name2 because cohesive_layer was 2nd parameter to adjacent_layers
+                name_to_remove=face_adjacency["name2"] # name2 because cohesive_layer was 2nd parameter to adjacent_layer_boundary_conditions
                 cohesive_layer_bodynames=cohesive_layer.gk_layer.bodynames()
                 for cnt in range(len(cohesive_layer_bodynames)):
                     if cohesive_layer_bodynames[cnt]==name_to_remove:
@@ -1653,7 +1656,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         bond_layers(DM,layer1,cohesive_layer,defaultBC=delamo.CADwrap.BC_DEFAULT_TIE,delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer1,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
 
         
-        face_adjacency_list = DM.modelbuilder.adjacent_layers(cohesive_layer.gk_layer,layer2.gk_layer,gk_delaminationlist,delamo.CADwrap.BC_TIE,delamo.CADwrap.BC_CONTACT,delamo.CADwrap.BC_NONE) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
+        face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(cohesive_layer.gk_layer,layer2.gk_layer,gk_delaminationlist,delamo.CADwrap.BC_TIE,delamo.CADwrap.BC_CONTACT,delamo.CADwrap.BC_NONE) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
         
         bond_layers(DM,cohesive_layer,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer2,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
 
@@ -1667,7 +1670,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         
     #face_adjacency_list = delamo.CADwrap.FAL()
     #if delaminationlist is None:
-    #face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,defaultBC) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
+    #face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,defaultBC) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
     #    pass
     #else:
 
@@ -1676,7 +1679,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         pass
     
 
-    face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
+    face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
     
 
     # Can not bond non-existant objects

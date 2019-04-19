@@ -250,29 +250,29 @@ class OCCModelBuilder(object):
         #     with common geometry from both sides. The outcome should include all faces
         #     imprinted        
 
-        # we are going to modify eval_face_pairs into match_face_pairs
+        # we created imprint_layers
         # that will imprint faces from lb1 onto lb2 and vice versa,
-        # and then return a dictionary indexed by the face in lb1
-        # of the corresponding imprinted face in lb2
+        # and then rebuilds the layerbodies of both lb1 and lb2 
         #
-        # It will do this by first comparing geometry, then
-        # doing a rigorous equality comparison via edges and vertices (as described above)
-        # taking all faces from layerbody1 that share and underlying surface with layerbody2
+        # It current does this based on the assumption that the underlying geometries
+        # of lb1 and lb2 come from the same source (same underlying surface object)
+        # It might be better to do this by first comparing geometry, then
+        # doing a rigorous equality comparison via edges and vertices (as described above).
+        # In any case, it 
+        # takes all faces from layerbody1 that share and underlying surface with layerbody2
         # and all of those faces from layerbody2, Then performing a fuse operation, yielding 
-        # a large number of pieces. Reconstruct layerbodies 1 and 2 from the correct
+        # a large number of pieces. Then it reconstructs layerbodies 1 and 2 from the correct
         # subpieces. A correct subpiece is one that, given a non-boundary point on the subpiece,
         # the point lies inside a pre-existing face of that layerbody
         #
-        # Then the correct subpieces can be sewn back together into the layerbody,
-        # and the face lists updates accordingly.
+        # Then imprint_layers updates the face lists accordingly and sews the correct subpieces
+        # back together into the layerbody.
         #
-        # Finally matched surface pairs can be returned.
 
-        # So maybe there is still and eval_face_pairs that assumes
-        # and checks that faces are properly imprinted against each
-        # other and the match_face_pairs performs necessary imprints,
-        # then calls eval_face_pairs
-
+        # eval_face_pairs that assumes
+        # and SHOULD check that faces are properly imprinted against each
+        # other 
+        # *!!!*** TODO: Check that all faces are properly imprinted
 
 
         
@@ -740,14 +740,16 @@ class OCCModelBuilder(object):
 
         pass
 
-    def adjacent_layers(self,layer1,layer2,bc_map=None):
-        """ Once adjacent_layers() is called, the LayerBody's in EITHER layer can't be split
+    def adjacent_layer_boundary_conditions(self,layer1,layer2,bc_map=None):
+        """ Once adjacent_layer_boundary_conditions() is called, the LayerBody's in EITHER layer can't be split
         anymore -- because then they might need new names,
         and the return values contain the layer body names that will be used
-        to apply the boundary conditions"""
+        to apply the boundary conditions. Returns the face adjacency list"""
 
         FAL = [] # Face Adjacency List
-        
+
+        self.imprint_layers(layer1,layer2)  # imprint_layers operates on the full layers because the bodies might be
+        # subdivided differently on both sides
         for lb1 in layer1.BodyList:
             for lb2 in layer2.BodyList:
                 FacePairs=self.eval_face_pairs(lb1,lb2)
@@ -829,7 +831,7 @@ if __name__=="__main__":
     MB.imprint_layers(Layer1, Layer2)
     MB.imprint_layers(Layer2, Layer3)
     #defaultBCType = 2
-    #FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
+    #FAL = MB.adjacent_layer_boundary_conditions(Layer1,Layer2,defaultBCType)
     #MB.apply_delaminations(Layer1,Layer2,delaminationlist)
 
 
