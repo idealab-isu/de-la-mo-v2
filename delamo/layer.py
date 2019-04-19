@@ -220,13 +220,30 @@ def OCCPointInFace(Point, Face, OrigPointTolerance):
     # parPointV = currentUV.Y()
     # print(parPointU, parPointV)
     #
-    FaceExplorer = BRepClass_FaceExplorer(Face)
-    C = BRepClass_FClassifier()
+    #FaceExplorer = BRepClass_FaceExplorer(Face)
+    #C = BRepClass_FClassifier()
     # C.Perform(FaceExplorer, gp_Pnt2d(parPointU, parPointV), OrigPointTolerance)
 
-    C.Perform(Face, facePoint, OrigPointTolerance )
+    #C.Perform(Face, facePoint, OrigPointTolerance )
 
-    return C.State()
+    #return C.State()
+
+    # Find the closest point by this method
+    # https://www.opencascade.com/content/closest-point-step-object
+
+
+    origPointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(facePoint).Vertex()
+
+    DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPointVertex)
+    DistanceCalculator.Perform()
+    if not DistanceCalculator.IsDone():
+        raise ValueError("Point to face distance calculation failed")
+    currentDist = DistanceCalculator.Value()
+
+    
+    if (currentDist < OrigPointTolerance):
+        return TopAbs_IN
+    return TopAbs_OUT
 
 
 class Layer(object):

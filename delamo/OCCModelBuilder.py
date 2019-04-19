@@ -65,7 +65,46 @@ import loaders
 import layer
 
 
+def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBodyFaceList,PointTolerance):
+    """ImprintedFaces are faces from a "Fuse" operation, that are equivalent to or subfaces of
+    elements in the LayerBodyFaceList. This function identifies all matching faces in the LayerBodyFaceList
+    corresponding to all ImprintedFaces, and performs  replacement of the LayerBodyFaceList
+    elements, with one or more elements from ImprintedFaces replacing each matched entry in LayerBodyFaceList.
+    Returns the updated LayerBodyFaceList """
 
+
+    AddToLayerBodyFaceList=[]
+    RemoveFromLayerBodyFaceListIndices=set([])
+    for faceShape in ImprintedFaces:
+        layerBodyFace = LayerBodyFace.FromOCC(topods_Face(faceShape),"OFFSET")
+        # Loop through all faces in this list
+        for layer1BodyFaceIndex in range(len(LayerBodyFaceList)):
+            layer1BodyFace=LayerBodyFaceList[layer1BodyFaceIndex]
+            
+            # Check if the reference point from fused face matches any other face
+            pointClassification = OCCPointInFace(layerBodyFace.Point, layer1BodyFace.Face,PointTolerance)
+            #print(pointClassification, TopAbs_IN, TopAbs_OUT, TopAbs_ON)
+            if (pointClassification == TopAbs_IN):
+                #print("Found a matched face in %s "%layer1BodyFace.Owner.Name)
+                layerBodyFace.Direction = layer1BodyFace.Direction
+                layerBodyFace.Owner = layer1BodyFace.Owner
+                AddToLayerBodyFaceList.append(layerBodyFace)
+                RemoveFromLayerBodyFaceListIndices.add(layer1BodyFaceIndex)
+                pass
+            
+            pass
+        
+        pass
+
+    ReturnFaceList=copy.copy(LayerBodyFaceList)
+    # Go through RemoveFromLayerBodyFaceListIndices from largest to smallest, removing them
+    for RemoveIndex in sorted(RemoveFromLayerBodyFaceListIndices,reverse=True):
+        del ReturnFaceList[RemoveIndex]
+        pass
+
+    # Add in all the faces to be added
+    ReturnFaceList.extend(AddToLayerBodyFaceList)
+    return ReturnFaceList
 
 class OCCModelBuilder(object):
     """The OCCModelBuilder contains global parameters 
@@ -649,27 +688,32 @@ class OCCModelBuilder(object):
         # testing whether that identification works on old faces.
         # ... Then replace the old faces with identified new faces.
 
-        for faceShape in FusedFaces:
-            layerBodyFace = LayerBodyFace.FromOCC(topods_Face(faceShape),"OFFSET")
-            # Loop through LayerBodies in layer1
-            for LB in layer1.BodyList:
-                # Loop through all faces in each LB
-                for layer1BodyFace in LB.FaceListOrig + LB.FaceListOffset + LB.FaceListSide: # Do we really need side? :
-                    # Check if the reference point from fused face matches any other face
-                    pointClassification = OCCPointInFace(layerBodyFace.Point, layer1BodyFace.Face, self.PointTolerance)
-                    print(pointClassification, TopAbs_IN, TopAbs_OUT, TopAbs_ON)
-                    if (pointClassification == TopAbs_IN):
-                        print("Found a matched face in %s "%layer1BodyFace.Owner.Name)
-                        layerBodyFace.Direction = layer1BodyFace.Direction
-                        layerBodyFace.Owner = layer1BodyFace.Owner
-                        pass
+        for LB in layer1.BodyList:
+            LB.FaceListOrig=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOrig,self.PointTolerance)
+            LB.FaceListOffset=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOffset,self.PointTolerance)
+            LB.FaceListSide=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListSide,self.PointTolerance)
 
-                    pass
-
-                pass
+            
+            # Rebuild layerbody from faces
+            LB.Rebuild_Shape()
+            
 
             pass
 
+        for LB in layer2.BodyList:
+            LB.FaceListOrig=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOrig,self.PointTolerance)
+            LB.FaceListOffset=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOffset,self.PointTolerance)
+            LB.FaceListSide=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListSide,self.PointTolerance)
+
+            
+            # Rebuild layerbody from faces
+            LB.Rebuild_Shape()
+            
+
+            pass
+
+
+        
         pass
 
 
@@ -685,10 +729,10 @@ class OCCModelBuilder(object):
         #    pass
         
         #step_writer.Write("../data/fusedFace.STEP")
-
-        sys.modules["__main__"].__dict__.update(globals())
-        sys.modules["__main__"].__dict__.update(locals())
-        raise ValueError("Break")
+        
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Break")
 
 
 
@@ -783,6 +827,7 @@ if __name__=="__main__":
     #delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
 
     MB.imprint_layers(Layer1, Layer2)
+    MB.imprint_layers(Layer2, Layer3)
     #defaultBCType = 2
     #FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
     #MB.apply_delaminations(Layer1,Layer2,delaminationlist)
