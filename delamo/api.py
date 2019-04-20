@@ -1059,7 +1059,11 @@ class Layer(Assembly):
             pass
         
         pass
-   
+
+    def Split(self,splitpath_filename,PointTolerance):
+        self.gk_layer.Split(splitpath_filename,PointTolerance)
+        pass
+    
     @classmethod
     def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, split=None, coordsys=None):
         """Create a layer given creation parameters to be passed to the geometry kernel, a name, ABAQUS Section, 
@@ -1131,38 +1135,6 @@ layup direction, etc."""
         
         return cls(name=name,gk_layer=gk_layer,layupdirection=layup,LayerSection=Section,coordsys=coordsys)
 
-
-    
-    @classmethod
-    def CreateSplitLayer(cls,DM,priorlayer,direction,thickness,name,Section,layup,filename,coordsys=None):
-        """Create a split layer using a prior layer as a mold,.  
- * direction: delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION
- * thickness: Thickness of layer (offsetting operation)
- * name: Unique name for layer
- * Section: ABAQUS section fo the layer
- * layup: Ply orientation in degrees
- * coordsys: Reference coordinate system for layup"""
-        # ***!!!! OBSOLETE -- NEEDS REWORK
-        # Read doxygen-generated documentation for ModelBuilder class for details...
-        return cls.CreateFromParams(DM, (priorlayer, direction, thickness), name, Section, layup, filename,coordsys=coordsys)
-
-    @classmethod
-    def CreateStiffenerFromLayer(cls,DM,priorlayer,name,LayerSection,stiffenerfilename): # direction == OFFSET_DIRECTION is implicit
-        """Create a stiffner layer using a prior layer as a mold,.  
- * name: Unique name for layer
- * LayerSection: ABAQUS section fo the stiffener layer
- * stiffnerfilename: File with cross section of the stiffener."""
-        gk_layer=delamo.CADwrap.Layer()
-
-        # ***!!!! OBSOLETE -- NEEDS UPDATE
-        DM.modelbuilder.create_hat_stiffener(priorlayer,gk_layer,stiffenerfilename)
-
-        gk_layer.name(name)
-
-
-        
-        return cls(gk_layer=gk_layer,LayerSection=LayerSection)
-    
 
     
     pass

@@ -481,8 +481,8 @@ class Layer(object):
             for MoldFace in Mold.FaceList: # Iterate over LayerBodyFaces in Mold
                 MoldFaceSurf=BRep_Tool.Surface(MoldFace.Face)
                 if MoldFaceSurf==FaceSurf: # Same underlying surface
-                    if MatchedInMold:
-                        raise ValueError("Same surface matched twice in mold (!?)")
+                    #if MatchedInMold:
+                    #    raise ValueError("Same surface matched twice in mold (!?)")  (this is actually OK)
                     MatchedInMold=True
                     pass
                 pass
