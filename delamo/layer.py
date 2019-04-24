@@ -1106,9 +1106,9 @@ class LayerBodyFace(object): # Formerly LayerSurface
         #return ThisSurface.DumpToString() == OtherSurface.DumpToString() and self.Face.IsEqual(other.Face)
 
 
-        # Update: Use OpenCascade IsEqual operator
-        # That tests for same underlying TShape (?) with same location and orientation
-        return self.Face.IsEqual(other.Face)
+        # Update: Use OpenCascade IsSame operator
+        # That tests for same underlying TShape (?) with same location but not necessarily orientation ... normal may be flipped.
+        return self.Face.IsSame(other.Face)
     
         
 
