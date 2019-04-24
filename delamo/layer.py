@@ -169,7 +169,7 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
             angleIncrement = 1
             parIncrement = 0.01
             pointFound = False
-            for angle in xrange(0,359,angleIncrement):
+            for angle in range(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
                 newV = ClosestV + parIncrement * math.sin(angle*math.pi/180.0)
 

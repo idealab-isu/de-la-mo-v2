@@ -162,6 +162,11 @@ def get_process_phases(original_script_file_name):
     database (above). """
 
 
+    if processor.original_to_predamage_tree is None:
+        # i.e. if redbaron import failed
+        
+        return (None,processes[None])  # just ORIGINAL step
+        
     
     original_tree=processor.tree_from_file(original_script_file_name)
 
