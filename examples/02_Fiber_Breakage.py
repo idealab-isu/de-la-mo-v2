@@ -152,10 +152,13 @@ bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
             
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
-for layer3partname in layer3.parts:
-    FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                       createStepName=ApplyForceStep.name,
-                       region=layer3.parts[layer3partname].GetInstanceFaceRegion(FixedPoint,0.07))
+
+FaceRegion=layer3.GetPartInstanceFaceRegionFromPoint(FixedPoint,0.07)
+
+FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                   createStepName=ApplyForceStep.name,
+                   region=FaceRegion)
+
 
 # Create 4th layer 
 layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_4",LaminaSection,90,coordsys=coordsys)

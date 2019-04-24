@@ -283,6 +283,23 @@ class Layer(object):
 
         return [ Body.Name for Body in self.BodyList ]
 
+    def FindLayerBodyNameByPoint(self,Point,PointTolerance):
+        PointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(Point[0],Point[1],Point[2])).Vertex()
+        
+        for Body in self.BodyList:
+
+            DistanceCalculator = BRepExtrema_DistShapeShape(Body.Shape, PointVertex)
+            DistanceCalculator.Perform()
+            
+            if DistanceCalculator.NbSolution() > 0:
+                CurrentDist = DistanceCalculator.Value()
+                if CurrentDist < PointTolerance:
+                    return Body.Name
+                pass
+            pass
+        return None
+        
+
     def OffsetMold(self):
         """Return a LayerMold based on the OFFSET side of this layer"""
         return LayerMold.FromFaceLists([ Body.FaceListOffset for Body in self.BodyList ])
@@ -1079,14 +1096,21 @@ class LayerBodyFace(object): # Formerly LayerSurface
         # 2nd imprint operation would give us another copy of the
         # geometry that would then not show pointer equivalence
         
-        ThisSurface = BRep_Tool().Surface(self.Face)
-        OtherSurface = BRep_Tool().Surface(other.Face)
+        #ThisSurface = BRep_Tool().Surface(self.Face)
+        #OtherSurface = BRep_Tool().Surface(other.Face)
         #print("ThisSurface=%s" % (str(ThisSurface)))
         #print("OtherSurface=%s" % (str(OtherSurface)))
         
         #print("Equality operator returns %s" % (str(ThisSurface.DumpToString() == OtherSurface.DumpToString())))
         
-        return ThisSurface.DumpToString() == OtherSurface.DumpToString()
+        #return ThisSurface.DumpToString() == OtherSurface.DumpToString() and self.Face.IsEqual(other.Face)
+
+
+        # Update: Use OpenCascade IsEqual operator
+        # That tests for same underlying TShape (?) with same location and orientation
+        return self.Face.IsEqual(other.Face)
+    
+        
 
     # Implement not equal operator
     def __ne__(self,other):

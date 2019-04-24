@@ -1063,6 +1063,13 @@ class Layer(Assembly):
     def Split(self,splitpath_filename,PointTolerance):
         self.gk_layer.Split(splitpath_filename,PointTolerance)
         pass
+
+    def GetPartInstanceFaceRegionFromPoint(self,Point,PointTolerance):
+        # May only be called after finalization
+        gk_layerbodyname = self.gk_layer.FindLayerBodyNameByPoint(Point,PointTolerance)
+        part = self.parts[gk_layerbodyname]
+        region=part.GetInstanceFaceRegion(Point,PointTolerance) # get ABAQUS region
+        return region
     
     @classmethod
     def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, split=None, coordsys=None):

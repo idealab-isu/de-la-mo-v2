@@ -77,6 +77,10 @@ def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBod
     RemoveFromLayerBodyFaceListIndices=set([])
     for faceShape in ImprintedFaces:
         layerBodyFace = LayerBodyFace.FromOCC(topods_Face(faceShape),"OFFSET")
+
+        #print("Imprint: Face of %s: Got point %s" % (LayerBodyFaceList[0].Owner.Name,str(layerBodyFace.Point)))
+
+        
         # Loop through all faces in this list
         for layer1BodyFaceIndex in range(len(LayerBodyFaceList)):
             layer1BodyFace=LayerBodyFaceList[layer1BodyFaceIndex]
@@ -84,7 +88,20 @@ def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBod
             # Check if the reference point from fused face matches any other face
             pointClassification = OCCPointInFace(layerBodyFace.Point, layer1BodyFace.Face,PointTolerance)
             #print(pointClassification, TopAbs_IN, TopAbs_OUT, TopAbs_ON)
+            print("Face of %s: pointClassification=%d" % (LayerBodyFaceList[layer1BodyFaceIndex].Owner.Name,pointClassification))
             if (pointClassification == TopAbs_IN):
+                
+                #if (layerBodyFace.Point[0] >-5.94 and layerBodyFace.Point[0] <-5.93):
+                #    print("Got troublesome point")
+                #    if "Split2" in LayerBodyFaceList[layer1BodyFaceIndex].Owner.Name:
+                #        print("writing debug.step")
+                #        step_writer=STEPControl_Writer()
+                #        step_writer.Transfer(layerBodyFace.Face,STEPControl_ShellBasedSurfaceModel,True)
+                #        step_writer.Transfer(layer1BodyFace.Face,STEPControl_ShellBasedSurfaceModel,True)
+                #        step_writer.Write('/tmp/debug.step')
+                #
+                #        pass
+                
                 #print("Found a matched face in %s "%layer1BodyFace.Owner.Name)
                 layerBodyFace.Direction = layer1BodyFace.Direction
                 layerBodyFace.Owner = layer1BodyFace.Owner
@@ -474,7 +491,9 @@ class OCCModelBuilder(object):
 
             split_face = topods_Face(split_face_shape)
             (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
-            
+
+            #print("Delam: Face of %s: Got point %s" % (layerbodyface.Owner.Name,str(Point)))
+
             split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
                                                       Point=Point,
                                                       Normal=Normal,
@@ -752,6 +771,7 @@ class OCCModelBuilder(object):
         # subdivided differently on both sides
         for lb1 in layer1.BodyList:
             for lb2 in layer2.BodyList:
+                #print("lb1 = %s; lb2=%s" % (lb1.Name,lb2.Name))
                 FacePairs=self.eval_face_pairs(lb1,lb2)
                 for postimprint_CommonFace in FacePairs:
                     BCType=postimprint_CommonFace.BCType
@@ -766,6 +786,13 @@ class OCCModelBuilder(object):
                         # apply user-supplied BC mapping
                         BCType=bc_map[BCType]
                         pass
+                    
+                    #print ("Appending to FAL: %s" % ({ "name1": lb1.Name,
+                    #                                   "name2": lb2.Name,
+                    #                                   "bcType": BCType,
+                    #                                   "point1": postimprint_CommonFace.Point,
+                    #                                   "normal1": postimprint_CommonFace.Normal,}))
+                    
                     FAL.append( { "name1": lb1.Name,
                                   "name2": lb2.Name,
                                   "bcType": BCType,
