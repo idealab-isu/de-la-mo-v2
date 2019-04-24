@@ -58,11 +58,11 @@ from OCC.STEPControl import STEPControl_Writer
 from OCC.STEPControl import STEPControl_ManifoldSolidBrep
 from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel,STEPControl_GeometricCurveSet
 
-from layer import LayerBody,LayerBodyFace
-from layer import OCCPointInFace
+from .layer import LayerBody,LayerBodyFace
+from .layer import OCCPointInFace
 
-import loaders
-import layer
+from . import loaders
+from . import layer
 
 
 def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBodyFaceList,PointTolerance):

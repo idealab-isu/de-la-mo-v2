@@ -69,7 +69,7 @@ from OCC.STEPControl import STEPControl_GeometricCurveSet
 from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
-import loaders
+from . import loaders 
 
 
 def ProjectEdgesOntoFace(edge_edges, face):

@@ -16,7 +16,7 @@ try:
     from . import processor
     pass
 except ImportError:
-    sys.stderr.write("RedBaron and/or delamo.processor not available; is RedBaron installed?\n\nTraceback follows\n---------------------------\n\n")
+    sys.stderr.write("RedBaron and/or delamo.processor not available; is RedBaron installed?\n\n(Only limited delamo_process functionality is available without RedBaron)\n\nTraceback follows\n---------------------------\n\n")
     traceback.print_exc()
 
     redbaron=None
@@ -26,6 +26,8 @@ except ImportError:
     class processor(object):
         original_to_predamage_tree=None
         predamage_to_damage_tree=None
+        predamage_preclean=None
+        run_damage_script=None
         pass
     pass
 
