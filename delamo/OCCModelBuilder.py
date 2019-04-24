@@ -465,12 +465,12 @@ class OCCModelBuilder(object):
         numsplitfaces = 0
         split_face_shapes=[]
         split_layerbodyfaces=[]
-        step_writer = STEPControl_Writer()
+        #step_writer = STEPControl_Writer()
 
         while split_face_exp.More():
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
-            step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
+            #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
 
             split_face = topods_Face(split_face_shape)
             (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
@@ -487,7 +487,7 @@ class OCCModelBuilder(object):
 
             split_face_exp.Next()
             pass
-        step_writer.Write("/tmp/split_faces.step")
+        #step_writer.Write("/tmp/split_faces.step")
 
         print("Number of split faces %d"%(numsplitfaces))
 
