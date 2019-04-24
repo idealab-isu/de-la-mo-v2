@@ -88,7 +88,7 @@ def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBod
             # Check if the reference point from fused face matches any other face
             pointClassification = OCCPointInFace(layerBodyFace.Point, layer1BodyFace.Face,PointTolerance)
             #print(pointClassification, TopAbs_IN, TopAbs_OUT, TopAbs_ON)
-            print("Face of %s: pointClassification=%d" % (LayerBodyFaceList[layer1BodyFaceIndex].Owner.Name,pointClassification))
+            #print("Face of %s: pointClassification=%d" % (LayerBodyFaceList[layer1BodyFaceIndex].Owner.Name,pointClassification))
             if (pointClassification == TopAbs_IN):
                 
                 #if (layerBodyFace.Point[0] >-5.94 and layerBodyFace.Point[0] <-5.93):
