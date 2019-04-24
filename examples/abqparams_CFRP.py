@@ -80,8 +80,8 @@ l_e_expanded = min(l_cz_I_expanded/Ne,l_cz_II_expanded/Ne)
 # Boundary condition params
 
 DispBC_ZDispl=85.0 #80.0 # mm
-meshsize=float(1.3) # mm
-finemeshsize=float(0.25) # mm
+meshsize=float(4.0) # mm
+finemeshsize=float(0.5) # mm
 
 # Create cohesive model
 CohesiveInteraction=FEModel.ContactProperty("CohesiveInteraction")
