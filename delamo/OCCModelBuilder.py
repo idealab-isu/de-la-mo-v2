@@ -105,6 +105,7 @@ def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBod
                 #print("Found a matched face in %s "%layer1BodyFace.Owner.Name)
                 layerBodyFace.Direction = layer1BodyFace.Direction
                 layerBodyFace.Owner = layer1BodyFace.Owner
+                layerBodyFace.BCType = layer1BodyFace.BCType
                 AddToLayerBodyFaceList.append(layerBodyFace)
                 RemoveFromLayerBodyFaceListIndices.add(layer1BodyFaceIndex)
                 pass
