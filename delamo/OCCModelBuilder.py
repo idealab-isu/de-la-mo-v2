@@ -568,6 +568,8 @@ class OCCModelBuilder(object):
         When done, rerun eval_face_pairs and use the resulting dictionary to construct and 
         return a face adjacency list (FAL)"""
 
+        self.imprint_layers(layer1,layer2) # make sure that layers are imprinted against each other
+
         for lb1cnt in range(len(layer1.BodyList)):
             lb1=layer1.BodyList[lb1cnt]
 
@@ -787,11 +789,11 @@ class OCCModelBuilder(object):
                         BCType=bc_map[BCType]
                         pass
                     
-                    #print ("Appending to FAL: %s" % ({ "name1": lb1.Name,
-                    #                                   "name2": lb2.Name,
-                    #                                   "bcType": BCType,
-                    #                                   "point1": postimprint_CommonFace.Point,
-                    #                                   "normal1": postimprint_CommonFace.Normal,}))
+                    print ("Appending to FAL: %s" % ({ "name1": lb1.Name,
+                                                       "name2": lb2.Name,
+                                                       "bcType": BCType,
+                                                       "point1": postimprint_CommonFace.Point,
+                                                       "normal1": postimprint_CommonFace.Normal,}))
                     
                     FAL.append( { "name1": lb1.Name,
                                   "name2": lb2.Name,
