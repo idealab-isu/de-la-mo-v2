@@ -1602,19 +1602,21 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
 
         if cohesive_layer is None:
             raise ValueError("When bonding layers with a cohesive layer, you must have explicitly created the cohesive layer and passed it as the cohesive_layer parameter")
-        if delaminationlist is not None:
 
-            # Split cohesive layer according to the delaminations
-            for cnt in range(len(delaminationlist)):
-                cohesive_layer.Split(delaminationlist[cnt],DM.abqpointtolerance)
-                pass
-            pass
+        # No longer splitting the cohesive layer because we no longer remove the piece of the cohesive layer so that we can support contact...
+        #if delaminationlist is not None:
+        #
+        #    # Split cohesive layer according to the delaminations
+        #    for cnt in range(len(delaminationlist)):
+        #        cohesive_layer.Split(delaminationlist[cnt],DM.abqpointtolerance)
+        #        pass
+        #    pass
 
         # Finalize the cohesive layer now that it has been split
         cohesive_layer.Finalize(DM)
 
-        #import pdb
-        #pdb.set_trace()
+        import pdb
+        pdb.set_trace()
 
         if delaminationlist is not None:
             DM.modelbuilder.apply_delaminations(layer1.gk_layer,cohesive_layer.gk_layer,delaminationlist) # Imprint faces on both sides, 
