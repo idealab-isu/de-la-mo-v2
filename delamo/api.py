@@ -813,7 +813,7 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
         sys.stderr.write("WARNING: Assuming region for sweep path is cells[0] (FIXME) and edge is edges[1]\n")
         # !!!*** ALSO need to add contact model for delaminated region across cohesive layer ***!!!
         #self.fe_part_meshing.NEED_TO_DETERMINE_SWEEP_PATH
-        self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=self.fe_part_meshing.edges[1],sense=SweepSense)
+        self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=self.fe_part_meshing.edges[5],sense=SweepSense)
         
         HexElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D8,elemLibrary=ElemLibrary)
         WedgeElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D6,elemLibrary=ElemLibrary)
@@ -1603,20 +1603,19 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         if cohesive_layer is None:
             raise ValueError("When bonding layers with a cohesive layer, you must have explicitly created the cohesive layer and passed it as the cohesive_layer parameter")
 
-        # No longer splitting the cohesive layer because we no longer remove the piece of the cohesive layer so that we can support contact...
-        #if delaminationlist is not None:
-        #
-        #    # Split cohesive layer according to the delaminations
-        #    for cnt in range(len(delaminationlist)):
-        #        cohesive_layer.Split(delaminationlist[cnt],DM.abqpointtolerance)
-        #        pass
-        #    pass
+        if delaminationlist is not None:
+        
+            # Split cohesive layer according to the delaminations
+            for cnt in range(len(delaminationlist)):
+                cohesive_layer.Split(delaminationlist[cnt],DM.abqpointtolerance)
+                pass
+            pass
 
         # Finalize the cohesive layer now that it has been split
         cohesive_layer.Finalize(DM)
 
-        import pdb
-        pdb.set_trace()
+        #import pdb
+        #pdb.set_trace()
 
         if delaminationlist is not None:
             DM.modelbuilder.apply_delaminations(layer1.gk_layer,cohesive_layer.gk_layer,delaminationlist) # Imprint faces on both sides, 
@@ -1627,19 +1626,18 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,cohesive_layer.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })  
         
         # Find delamination region from FAL so cohesive_layer is removed in this region
-        # (no longer do this because it would impede defining contact BC)
-        #for face_adjacency in face_adjacency_list:
-        #    if face_adjacency["bcType"]=="NONE" or face_adjacency["bcType"]=="CONTACT":
-        #        name_to_remove=face_adjacency["name2"] # name2 because cohesive_layer was 2nd parameter to adjacent_layer_boundary_conditions
-        #        cohesive_layer_bodynames=[ layerbody.Name for layerbody in cohesive_layer.gk_layer.BodyList ]
-        #        for cnt in range(len(cohesive_layer_bodynames)):
-        #            if cohesive_layer_bodynames[cnt]==name_to_remove:
-        #                # Remove body from layer. This is OK because Layers are mutable
-        #                del cohesive_layer.gk_layer.BodyList[cnt] 
-        #                break
-        #            pass
-        #        pass
-        #    pass
+        for face_adjacency in face_adjacency_list:
+            if face_adjacency["bcType"]=="NONE" or face_adjacency["bcType"]=="CONTACT":
+                name_to_remove=face_adjacency["name2"] # name2 because cohesive_layer was 2nd parameter to adjacent_layer_boundary_conditions
+                cohesive_layer_bodynames=[ layerbody.Name for layerbody in cohesive_layer.gk_layer.BodyList ]
+                for cnt in range(len(cohesive_layer_bodynames)):
+                    if cohesive_layer_bodynames[cnt]==name_to_remove:
+                        # Remove body from layer. This is OK because Layers are mutable
+                        del cohesive_layer.gk_layer.BodyList[cnt] 
+                        break
+                    pass
+                pass
+            pass
         
         # Now call ourselves to create TIE bond between layer1 and cohesive_layer, except in the delaminated region
 
