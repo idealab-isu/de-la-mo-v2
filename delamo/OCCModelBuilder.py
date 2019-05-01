@@ -22,6 +22,7 @@ from OCC import BRepOffset
 from OCC import BRepBuilderAPI
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
+from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 #from OCC.BRepClass import BRepClass_FacePassiveClassifier
 from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
@@ -478,6 +479,7 @@ class OCCModelBuilder(object):
         #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer2.Write("../data/allShapes.STEP")
 
+
         split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
         # Iterate over all faces
         numsplitfaces = 0
@@ -536,16 +538,48 @@ class OCCModelBuilder(object):
                 layerbody.FaceListOffset.append(split_layerbodyface)
                 pass
             pass
-        
-        
 
         # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
-        
+
+        # Create a reference face using the ProjectionEdges and layerbodyface.Face
+        # Project the outline onto the face to figure out Boundary Conditions
+        projectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
+
+        #Make wire from edges
+        WireBuilder = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+        WirePerimeter = TopoDS_Compound()
+        WireBuilder.MakeCompound(WirePerimeter)
+
+        delamWire = TopoDS_Wire()
+        WireBuilder.MakeWire(delamWire)
+
+        for edgecnt in range(len(edge_edges)):
+            projectionEdge = projectionEdges[edgecnt]
+            WireBuilder.Add(delamWire, projectionEdge)
+            pass
+
+        delamSurface = BRep_Tool.Surface(layerbodyface.Face)
+        FaceBuilder = BRepBuilderAPI_MakeFace(delamSurface, self.PointTolerance)
+        delamFace = FaceBuilder.Face()
+        FaceBuilder.Add(delamWire)
+
+        error = FaceBuilder.Error()
+        print("Error : %d"%(error))
+        #if (error != BRepBuilderAPI_Error.BRepBuilderAPI_FaceDone):
+        #    print("Face generation failed!")
+
+        step_writer2=STEPControl_Writer()
+        step_writer2.Transfer(delamFace,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Transfer(delamWire,STEPControl_GeometricCurveSet,True)
+        step_writer2.Write("../data/allShapes.STEP")
+
+
+        sys.modules["__main__"].__dict__.update(globals())
+        sys.modules["__main__"].__dict__.update(locals())
+        raise ValueError("Break")
+
         # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
 
-        #sys.modules["__main__"].__dict__.update(globals())
-        #sys.modules["__main__"].__dict__.update(locals())
-        #raise ValueError("Break")
 
         layerbody.Rebuild_Shape()
         
@@ -852,14 +886,14 @@ if __name__=="__main__":
     #Layer2=layer.Layer.CreateFromMold("Layer 2",Mold,2.0,"OFFSET",1e-6)
     Layer3=layer.Layer.CreateFromMold("Layer 3",Layer2.OffsetMold(),2.0,"OFFSET",pointTolerance)
 
-    Layer2.Split(os.path.join("..","data","SplitLine2.csv"), pointTolerance)
+    #Layer2.Split(os.path.join("..","data","SplitLine2.csv"), pointTolerance)
 
 
     #delaminationlist = [ ]
-    #delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
+    delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
 
-    MB.imprint_layers(Layer1, Layer2)
-    MB.imprint_layers(Layer2, Layer3)
+    #MB.imprint_layers(Layer1, Layer2)
+    #MB.imprint_layers(Layer2, Layer3)
     #defaultBCType = 2
     #FAL = MB.adjacent_layer_boundary_conditions(Layer1,Layer2,defaultBCType)
     #MB.apply_delaminations(Layer1,Layer2,delaminationlist)
@@ -869,7 +903,7 @@ if __name__=="__main__":
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
-    step_writer.Transfer(Layer2.BodyList[1].Shape,STEPControl_ManifoldSolidBrep,True)
+    #step_writer.Transfer(Layer2.BodyList[1].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer3.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Write(os.path.join("..","data","Layers.step"))
 
