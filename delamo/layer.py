@@ -69,7 +69,32 @@ from OCC.STEPControl import STEPControl_GeometricCurveSet
 from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
-from . import loaders 
+from . import loaders
+
+
+def OffsetFaceMoreAlongDirection(face, offsetDir, PointTolerance):
+    assert(offsetDir == 1 or offsetDir == -1)
+    OffsetDist = 1000.0 * PointTolerance * offsetDir
+
+    mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, OffsetDist, PointTolerance,
+                                                            BRepOffset.BRepOffset_Skin,
+                                                            False, False,
+                                                            GeomAbs_Arc)
+    assert (mkOffset.IsDone())
+
+    OffsetShell = mkOffset.Shape()
+
+    OffsetShellFacesExp = TopExp_Explorer(OffsetShell, TopAbs_FACE)
+    OffsetFaces = []
+
+    while OffsetShellFacesExp.More():
+        OffsetFaces.append(topods_Face(OffsetShellFacesExp.Current()))
+        OffsetShellFacesExp.Next()
+        pass
+
+    assert (len(OffsetFaces) == 1)  # Offset of a single face should give a single face
+
+    return OffsetFaces[0]
 
 
 def ProjectEdgesOntoFace(edge_edges, face):
@@ -617,9 +642,6 @@ class LayerBody(object):
         if not solidMaker.IsDone():
             raise ValueError("Solid maker failed")
 
-        #sys.modules["__main__"].__dict__.update(globals())
-        #sys.modules["__main__"].__dict__.update(locals())
-        #raise ValueError("Break")
         solidShape = solidMaker.Solid()
         
         if not BRepLib.breplib_OrientClosedSolid(solidShape):
@@ -697,11 +719,18 @@ class LayerBody(object):
         # offsetFace and origFace share the same underlying surface
         # and we are just using these to create a tool
         # that will be used to cut the body.
+
+        # There is an issue for curved faces when the tool does not completely extend beyond
+        # the top and bottom of the layer. To deal with such faces, we will offset the orig
+        # and offset faces in opposite directions to create a tool that is slightly bigger
+
         offsetFace = self.FaceListOffset[0].Face
+        offsetOffsetFace = OffsetFaceMoreAlongDirection(offsetFace, 1, Tolerance)
         origFace = self.FaceListOrig[0].Face
-            
-        ProjectionEdges_a = ProjectEdgesOntoFace(edge_edges, origFace)
-        ProjectionEdges_b = ProjectEdgesOntoFace(edge_edges, offsetFace)
+        offsetOrigFace = OffsetFaceMoreAlongDirection(origFace, 1, Tolerance)
+
+        ProjectionEdges_a = ProjectEdgesOntoFace(edge_edges, offsetOffsetFace)
+        ProjectionEdges_b = ProjectEdgesOntoFace(edge_edges, offsetOrigFace)
         
         # Generate faces connecting original and offset projected edges.
         # We will use this as a tool to do the cut.
@@ -749,13 +778,15 @@ class LayerBody(object):
         SplitBodies = GASplitter.Shape()
         
         #step_writer2=STEPControl_Writer()
-        #step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        #step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
-        #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer2.Transfer(CutToolShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Transfer(self.Shape, STEPControl_ManifoldSolidBrep, True)
         #step_writer2.Transfer(SplitBodies,STEPControl_ManifoldSolidBrep,True)
         #step_writer2.Write("../data/allShapes.STEP")
-        
-        
+
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Break")
+
         # !!!*** Need to create two layerbodies, replacing the existing layerbody in the
         # layer structure. Need to generate and sort LayerBodyFaces into all of the right places. 
         
