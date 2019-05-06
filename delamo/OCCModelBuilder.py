@@ -13,12 +13,15 @@ from OCC.TopoDS import TopoDS_Shell
 from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
 from OCC.TopoDS import topods_Edge
+from OCC.TopoDS import topods_Wire
 from OCC.BRep import BRep_Builder
 from OCC.BRep import BRep_Tool
 from OCC.BRepExtrema import BRepExtrema_DistShapeShape
 from OCC import BRepLib
 from OCC import BRepOffsetAPI
 from OCC import BRepOffset
+from OCC.Geom import Geom_OffsetCurve
+from OCC.Geom import Geom_Curve
 from OCC import BRepBuilderAPI
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
@@ -39,6 +42,7 @@ from OCC.TopAbs import TopAbs_SHELL
 from OCC.TopAbs import TopAbs_FORWARD
 from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
+from OCC.GeomAbs import GeomAbs_Intersection
 from OCC.Geom import Geom_Line
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
 from OCC.TopTools import TopTools_ListOfShape
@@ -48,6 +52,7 @@ from OCC.gp import gp_Vec
 from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
 from OCC.GEOMAlgo import GEOMAlgo_Splitter
+from OCC.Geom2d import Geom2d_Curve
 from OCC.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCC import GeomProjLib
 from OCC.TColgp import TColgp_Array1OfPnt
@@ -338,7 +343,7 @@ class OCCModelBuilder(object):
         # split (which they aren't from this function)
 
 
-        SideShapes=[]
+        ToolShapes=[]
         
         for delam_outline in delam_outlines:
             # ***!!! Temporarily load curve rather than constructing wire from delamination outline
@@ -391,10 +396,21 @@ class OCCModelBuilder(object):
             WireShape = WireBuilder.Shape()
             assert(WireShape.Closed())
 
+            # Offset wire to create no model shape
+
+            # Offset the tool shape to create the inner tool shape for the no model zone
+            #NoModelDist = -1
+            #mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffset(topods_Wire(WireShape), GeomAbs_Arc, False)
+            #mkOffset.Perform(NoModelDist)
+
+            #assert (mkOffset.IsDone())
+            #WireInShape = mkOffset.Shape()
+
             #step_writer2=STEPControl_Writer()
             #step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
-            #step_writer2.Write("../data/Wire.STEP")
-            #
+            #step_writer2.Transfer(WireInShape,STEPControl_GeometricCurveSet,True)
+            #step_writer2.Write("../data/allShapes.STEP")
+
             #sys.modules["__main__"].__dict__.update(globals())
             #sys.modules["__main__"].__dict__.update(locals())
             #raise ValueError("Break")
@@ -418,6 +434,25 @@ class OCCModelBuilder(object):
             
             ProjectionEdges_a = self.ProjectEdgesOntoFace(edge_edges,bounding_face_a)
             ProjectionEdges_b = self.ProjectEdgesOntoFace(edge_edges,bounding_face_b)
+
+            # Project the curve on to the face to figure out the parametric curve
+            ProjectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
+
+            # Evaluate points on projected curve and evaluate the parametric points
+            for edgecnt in range(len(edge_edges)):
+                projectionEdge = ProjectionEdges[edgecnt]
+                curveParPts = []
+                (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(projectionEdge, layerbodyface.Face)
+                curve = curveHandle.GetObject()
+                print(parStart, parEnd)
+                for u in [x * (1.0/100.0) for x in range(0, 100)]:
+                    curvePoint = curve.Value(u)
+                    curveParPts.append(curvePoint)
+
+
+            step_writer2=STEPControl_Writer()
+            step_writer2.Transfer(ProjectionEdge,STEPControl_GeometricCurveSet,True)
+            step_writer2.Write("../data/allShapes.STEP")
 
             # Generate faces connecting original and projected edges.
             # We will use this as a tool to do the cut. 
@@ -443,25 +478,46 @@ class OCCModelBuilder(object):
                 pass
             
             # Generate side faces
-            SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
-            SideGenerator.AddWire(wire_a)
-            SideGenerator.AddWire(wire_b)
-            SideGenerator.Build()
+            ToolGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
+            ToolGenerator.AddWire(wire_a)
+            ToolGenerator.AddWire(wire_b)
+            ToolGenerator.Build()
             
-            if (not SideGenerator.IsDone()):
-                raise ValueError("Side face generation failed\n")
+            if (not ToolGenerator.IsDone()):
+                raise ValueError("Tool side face generation failed\n")
         
-            SideShape = SideGenerator.Shape()
-            
-            build.Add(Perimeter,SideShape)
-            SideShapes.append(SideShape)
+            ToolShape = ToolGenerator.Shape()
+
+            build.Add(Perimeter,ToolShape)
+            ToolShapes.append(ToolShape)
+
+            # Offset the tool shape to create the inner tool shape for the no model zone
+
+            NoModelDist = 1
+            mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, NoModelDist, self.PointTolerance,
+                                                                   BRepOffset.BRepOffset_Skin,
+                                                                   False, False,
+                                                                   GeomAbs_Arc)
+
+            assert (mkOffset.IsDone())
+            NoModelToolShape = mkOffset.Shape()
+
+            step_writer2=STEPControl_Writer()
+            step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            step_writer2.Write("../data/allShapes.STEP")
+
+            sys.modules["__main__"].__dict__.update(globals())
+            sys.modules["__main__"].__dict__.update(locals())
+            raise ValueError("Break")
+
             pass
         
             
         GASplitter=GEOMAlgo_Splitter()
         GASplitter.AddArgument(topods_Face(layerbodyface.Face))
-        for SideShape in SideShapes:
-            GASplitter.AddTool(SideShape)
+        for ToolShape in ToolShapes:
+            GASplitter.AddTool(ToolShape)
             pass
         
         GASplitter.Perform()
@@ -469,7 +525,7 @@ class OCCModelBuilder(object):
         #if (not GASplitter.IsDone()):
         #    raise ValueError("Splitting face failed\n")
 
-        SplitFace= GASplitter.Shape()
+        SplitFace = GASplitter.Shape()
         # Hopefully this did not damage layerbodyface
         
         #step_writer2=STEPControl_Writer()
@@ -478,7 +534,6 @@ class OCCModelBuilder(object):
         ##step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
         #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer2.Write("../data/allShapes.STEP")
-
 
         split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
         # Iterate over all faces
@@ -509,8 +564,6 @@ class OCCModelBuilder(object):
 
             split_face_exp.Next()
             pass
-        #step_writer.Write("/tmp/split_faces.step")
-
         print("Number of split faces %d"%(numsplitfaces))
 
         # split_face_shapes now should have two or more faces (TopoDS_Shape of type Face
