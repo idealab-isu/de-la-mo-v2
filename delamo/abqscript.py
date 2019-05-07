@@ -18,7 +18,7 @@ class dummy(object):
     pass
 
 
-def build_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,runinstrs):
+def build_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,fiberinstrs,runinstrs):
     # find installed directory
     thisfile=sys.modules[dummy.__module__].__file__
     thisdir=os.path.split(thisfile)[0]
@@ -68,6 +68,10 @@ def build_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,runinstrs):
                 outbuf.write(meshinstrs.get_code())
                 outbuf.write(u"\n")
                 pass
+            elif line.startswith("###RUN_FIBERINSTRS"):
+                outbuf.write(fiberinstrs.get_code())
+                outbuf.write(u"\n")
+                pass
             elif line.startswith("###RUN_RUNINSTRS"):
                 outbuf.write(runinstrs.get_code())
                 outbuf.write(u"\n")
@@ -80,9 +84,9 @@ def build_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,runinstrs):
     
     return outbuf.getvalue()
     
-def write_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,runinstrs,outfilename):
+def write_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,fiberinstrs,runinstrs,outfilename):
 
-    scriptstr=build_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,runinstrs)
+    scriptstr=build_abq_script(initinstrs,assemblyinstrs,bcinstrs,meshinstrs,fiberinstrs,runinstrs)
 
     with open(outfilename,"w") as outfh:
         outfh.write(scriptstr)

@@ -57,6 +57,10 @@ from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
 from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
 
+from OCC.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Bnd import Bnd_Box
+from OCC.BRepBndLib import brepbndlib_Add
+from OCC.TopLoc import TopLoc_Location
 
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
@@ -204,6 +208,231 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     return (np.array((facePoint.X(), facePoint.Y(), facePoint.Z()), dtype='d'),
              np.array((faceNormal.X(), faceNormal.Y(), faceNormal.Z()), dtype='d'),
              np.array((faceParPoint[0], faceParPoint[1]), dtype='d'))
+
+
+def VectorNormalize(v):
+    return v / np.linalg.norm(v)
+
+
+def Distance(a, b):
+    return np.sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]))
+
+
+def CreateMidVertex(v1, v2):
+    v01 = DMVertex()
+    v01.point = (v1.point + v2.point) / 2.0
+    v01.normal = (v1.normal + v2.normal) / 2.0
+    VectorNormalize(v01.normal)
+    return v01
+
+
+def Tessellate(Object, Shape, MeshSize):
+    B = Bnd_Box()
+    brepbndlib_Add(Shape, B)
+    bBoxMinX, bBoxMinY, bBoxMinZ, bBoxMaxX, bBoxMaxY, bBoxMaxZ = B.Get()
+
+    Object.bBoxMin[0] = bBoxMinX
+    Object.bBoxMin[1] = bBoxMinY
+    Object.bBoxMin[2] = bBoxMinZ
+    Object.bBoxMax[0] = bBoxMaxX
+    Object.bBoxMax[1] = bBoxMaxY
+    Object.bBoxMax[2] = bBoxMaxZ
+
+    currentModelSize = Distance(np.array([bBoxMinX, bBoxMinY, bBoxMinZ]), np.array([bBoxMaxX, bBoxMaxY, bBoxMaxZ]))
+    meshMaxSize = MeshSize * currentModelSize
+
+    mesher = BRepMesh_IncrementalMesh()
+    mesher.SetShape(Shape)
+    mesher.SetAngle(0.01)
+    mesher.SetControlSurfaceDeflection(True)
+    mesher.SetDeflection(0.001 * currentModelSize)
+    mesher.SetParallel(True)
+    mesher.SetInternalVerticesMode(True)
+    mesher.SetMinSize(0.005 * currentModelSize)
+    mesher.SetRelative(False)
+    mesher.Perform()
+
+    return meshMaxSize
+
+
+class DMObject:
+
+    def __init__(self, **kwargs):
+        self.totalNumTriangles = 0
+        self.objID = None
+
+        self.bBoxMin = np.zeros((3))
+        self.bBoxMax = np.zeros((3))
+
+        self.faces = []
+
+        self.filepath = ""
+
+    def RefineTessellation(self, minEdgeLength):
+        DELTA = 1e-3
+        numTrianglesAdded = 0
+        maxObjectEdgeLen = 0
+        # k = 6
+        for k in range(0, len(self.faces)):
+            continueRefining = True
+            face = self.faces[k]
+            while continueRefining:
+                j = 1
+                maxFaceEdgeLen = 0.0
+                newMaxEdgeLen = 0.0
+                refined = False
+                numTriangles = len(face.triangles)
+                while j < numTriangles:
+                    t = face.triangles[j-1]
+                    edgeLen01 = Distance(t.vertices[0].point, t.vertices[1].point)
+                    edgeLen12 = Distance(t.vertices[1].point, t.vertices[2].point)
+                    edgeLen20 = Distance(t.vertices[2].point, t.vertices[0].point)
+                    maxEdgeLen = max(max(edgeLen01, edgeLen12), edgeLen20)
+                    if maxEdgeLen > minEdgeLength:
+                        t1 = DMTriangle()
+                        t2 = DMTriangle()
+
+                        t1.facenormal = t.facenormal
+                        t1.visibilityFactor = 0
+                        t2.facenormal = t.facenormal
+                        t1.visibilityFactor = 0
+
+                        if abs(edgeLen01 - maxEdgeLen) < DELTA:
+                            mid01 = CreateMidVertex(t.vertices[0], t.vertices[1])
+                            t1[0] = t[0]
+                            t1[1] = mid01
+                            t1[2] = t[2]
+
+                            t2[0] = mid01
+                            t2[1] = t[1]
+                            t2[2] = t[2]
+                            newMaxEdgeLen = max(max(edgeLen01 / 2.0, edgeLen12), edgeLen20)
+                        elif abs(edgeLen12 - maxEdgeLen) < DELTA:
+                            mid12 = CreateMidVertex(t.vertices[1], t.vertices[2])
+
+                            t1[0] = t[0]
+                            t1[1] = t[1]
+                            t1[2] = mid12
+
+                            t2[0] = t[0]
+                            t2[1] = mid12
+                            t2[2] = t[2]
+                            newMaxEdgeLen = max(max(edgeLen01, edgeLen12 / 2.0), edgeLen20)
+                        elif abs(edgeLen20 - maxEdgeLen) < DELTA:
+                            mid20 = CreateMidVertex(t.vertices[2], t.vertices[0])
+
+                            t1[0] = t[0]
+                            t1[1] = t[1]
+                            t1[2] = mid20
+
+                            t2[0] = mid20
+                            t2[1] = t[1]
+                            t2[2] = t[2]
+                            newMaxEdgeLen = max(max(edgeLen01, edgeLen12), edgeLen20 / 2.0)
+
+                        face.triangles.append(t1)
+                        face.triangles.append(t2)
+                        del face.triangles[j-1]
+                        numTriangles += 1
+                        self.totalNumTriangles += 1
+                        numTrianglesAdded += 1
+                        j -= 1
+                        refined = True
+
+                        if numTrianglesAdded % 100 == 0:
+                            print ".",
+                    else:
+                        newMaxEdgeLen = maxEdgeLen
+
+                    if not refined:
+                        continueRefining = False
+
+                    j += 1
+                if newMaxEdgeLen > maxFaceEdgeLen:
+                    maxFaceEdgeLen = newMaxEdgeLen
+            if maxFaceEdgeLen > maxObjectEdgeLen:
+                maxObjectEdgeLen = maxFaceEdgeLen
+            print("")
+
+        print("Maximum edge length set       : %s" % minEdgeLength)
+        print("Maximum edge length in object : %s" % maxObjectEdgeLen)
+        print("Object refined with %s triangles added." % numTrianglesAdded)
+
+    def SaveSTL(self, path, name):
+        if os.path.exists(path):
+            self.filepath = os.path.join(path, name)
+            f = open(self.filepath, "w+")
+
+            f.write("solid %s\n" % name)
+
+            for faceNum in range(0, len(self.faces)):
+                currentFace = self.faces[faceNum]
+                for trinum in range(0, len(currentFace.triangles)):
+                    f.write("facet normal {} {} {}\n".format(currentFace.triangles[trinum].facenormal[0],
+                                                           currentFace.triangles[trinum].facenormal[1],
+                                                           currentFace.triangles[trinum].facenormal[2]))
+                    f.write("outer loop\n")
+                    for i in range(0, 3):
+                        f.write("\tvertex {} {} {}\n".format(currentFace.triangles[trinum].vertices[i].point[0],
+                                                           currentFace.triangles[trinum].vertices[i].point[1],
+                                                           currentFace.triangles[trinum].vertices[i].point[2]))
+                    f.write("endloop\n")
+                    f.write("endfacet\n")
+            f.write("endsolid")
+            f.close()
+        else:
+            print("STL file path does not exist.")
+
+
+class DMFace:
+
+    def __init__(self, **kwargs):
+        self.dlid = 0
+        self.surfID = 0
+        self.parentObjID = None
+        self.trimmed = None
+
+        self.bBoxMin = np.zeros((3))
+        self.bBoxMax = np.zeros((3))
+
+        self.vertexFaces = []
+        self.triangles = []
+
+    def GetCommonFace(self, vi1, vi2, face):
+        commonFaceIndex = -1
+        for p in range(0, len(self.vertexFaces[vi1])):
+            faceIndex1 = self.vertexFaces[vi1][p]
+            if p != face:
+                for q in range(0, len(self.vertexFaces[vi2])):
+                    faceIndex2 = self.vertexFaces[vi2][q]
+                    if faceIndex1 == faceIndex2:
+                        commonFaceIndex = faceIndex1
+        return commonFaceIndex
+
+
+class DMTriangle:
+
+    def __init__(self, **kwargs):
+        self.vertices = [None, None, None]
+        self.vertexIndex = None
+        self.facenormal = None
+        self.visibilityFactor = 0
+
+        self.adjacentFaceIndex = np.zeros((3))
+
+    def __getitem__(self, item):
+        return self.vertices[item]
+
+    def __setitem__(self, key, value):
+        self.vertices[key] = value
+
+
+class DMVertex:
+
+    def __init__(self, **kwargs):
+        self.point = None
+        self.normal = np.zeros((3))
+
 
 class Layer(object):
     """The Layer is a collection of LayerBodies representing 
@@ -614,6 +843,137 @@ class Layer(object):
         return NewLayer
     pass
 
+    @classmethod
+    def CreateDMObject(cls, solidShape, MeshSize):
+        totalNumFaces = 0
+        totalNumTriangles = 0
+        modelPos = np.zeros((3))
+        modelSize = 0.0
+
+        tempObject = DMObject()
+        tempObject.totalNumTriangles = 0
+        tempObject.objID = 1
+
+        meshMaxSize = Tessellate(tempObject, solidShape, MeshSize)
+
+        faceID = 0
+
+        # Iterate over all faces
+        FaceExp=TopExp_Explorer(solidShape,TopAbs_FACE)
+
+        while FaceExp.More():
+            # Extract the Surface object (geometry, not topology) underlying this face
+            tds_Face=topods_Face(FaceExp.Current())
+
+            objFace = DMFace()
+            objFace.dlid = tempObject.objID * 1000 + faceID + 1
+            objFace.surfID = faceID
+            objFace.parentObjID = tempObject.objID
+            objFace.trimmed = False
+
+            FB = Bnd_Box()
+
+            brepbndlib_Add(tds_Face, FB)
+            bBoxMinX, bBoxMinY, bBoxMinZ, bBoxMaxX, bBoxMaxY, bBoxMaxZ = FB.Get()
+            faceOffset = 0.0
+            objFace.bBoxMin[0] = bBoxMinX - faceOffset
+            objFace.bBoxMin[1] = bBoxMinY - faceOffset
+            objFace.bBoxMin[2] = bBoxMinZ - faceOffset
+            objFace.bBoxMax[0] = bBoxMinX + faceOffset
+            objFace.bBoxMax[1] = bBoxMinY + faceOffset
+            objFace.bBoxMax[2] = bBoxMinZ + faceOffset
+
+            L = TopLoc_Location()
+            faceTriangulation = BRep_Tool().Triangulation(tds_Face, L).GetObject()
+            numTriangles = faceTriangulation.NbTriangles()
+            numVertices = faceTriangulation.NbNodes()
+
+            tempVertices = []
+            if numVertices > 0 and numTriangles > 0:
+                tri = faceTriangulation.Triangles()
+
+                for i in range(0, numVertices):
+                    currentVertex = faceTriangulation.Nodes().Value(i+1)
+                    tempVertex = DMVertex()
+                    tempVertex.point = np.array([currentVertex.X(), currentVertex.Y(), currentVertex.Z()])
+                    tempVertices.append(tempVertex)
+                    objFace.vertexFaces.append([])
+
+                for i in range(0, faceTriangulation.NbTriangles()):
+                    trian = tri.Value(i+1)
+                    index1, index2, index3 = trian.Get()
+
+                    t = DMTriangle()
+                    t.vertexIndex = np.array([index1, index2, index3])
+
+                    t[0] = tempVertices[t.vertexIndex[0]-1]
+                    t[1] = tempVertices[t.vertexIndex[1]-1]
+                    t[2] = tempVertices[t.vertexIndex[2]-1]
+
+                    side1 = t[1].point - t[0].point
+                    side2 = t[2].point - t[0].point
+
+                    t.facenormal = np.cross(side1, side2)
+                    area = 0.5*np.linalg.norm(t.facenormal)
+                    t.facenormal = VectorNormalize(t.facenormal)
+
+                    tempVertices[t.vertexIndex[0]-1].normal += area * t.facenormal
+                    tempVertices[t.vertexIndex[1]-1].normal += area * t.facenormal
+                    tempVertices[t.vertexIndex[2]-1].normal += area * t.facenormal
+
+                    t.visibilityFactor = 0
+
+                    triangleNum = len(objFace.triangles)
+                    objFace.vertexFaces[t.vertexIndex[0]-1].append(triangleNum)
+                    objFace.vertexFaces[t.vertexIndex[1]-1].append(triangleNum)
+                    objFace.vertexFaces[t.vertexIndex[2]-1].append(triangleNum)
+                    objFace.triangles.append(t)
+                print("Face %s triangulated with %s triangles." % (faceID, faceTriangulation.NbNodes()))
+            else:
+                print("Face %s triangulation failed!" % faceID)
+
+            for i in range(0, len(tempVertices)):
+                tempVertices[i].normal = VectorNormalize(tempVertices[i].normal)
+
+            for i in range(0, len(objFace.triangles)):
+                vertexIndex = objFace.triangles[i].vertexIndex
+                objFace.triangles[i].triangleID = i
+                objFace.triangles[i][0].normal = tempVertices[vertexIndex[0] - 1].normal
+                objFace.triangles[i][1].normal = tempVertices[vertexIndex[1] - 1].normal
+                objFace.triangles[i][2].normal = tempVertices[vertexIndex[2] - 1].normal
+
+                objFace.triangles[i].adjacentFaceIndex[0] = objFace.GetCommonFace(vertexIndex[0] - 1,
+                                                                                  vertexIndex[1] - 1, i)
+                objFace.triangles[i].adjacentFaceIndex[1] = objFace.GetCommonFace(vertexIndex[1] - 1,
+                                                                                  vertexIndex[2] - 1, i)
+                objFace.triangles[i].adjacentFaceIndex[2] = objFace.GetCommonFace(vertexIndex[2] - 1,
+                                                                                  vertexIndex[0] - 1, i)
+
+                totalNumTriangles += 1
+                tempObject.totalNumTriangles += 1
+
+            tempObject.faces.append(objFace)
+            del tempVertices
+            faceID += 1
+            totalNumFaces += 1
+
+            FaceExp.Next()
+
+
+        oldNumTriangles = tempObject.totalNumTriangles
+        tempObject.RefineTessellation(meshMaxSize)
+        totalNumTriangles += (tempObject.totalNumTriangles - oldNumTriangles)
+
+        currentModelSize = np.linalg.norm(tempObject.bBoxMax - tempObject.bBoxMin) / 4
+        if currentModelSize > modelSize:
+            modelSize = currentModelSize
+        currentModelPos = np.array([-(tempObject.bBoxMin[0] + tempObject.bBoxMax[0]),
+                                    -(tempObject.bBoxMin[1] + tempObject.bBoxMax[1]),
+                                    -(tempObject.bBoxMin[2] + tempObject.bBoxMax[2])])
+        modelPos = (modelPos + currentModelPos) / 2.0
+
+        return tempObject
+
 
 class LayerBody(object):
     """ The LayerBody is a solid, defined as a boundary representation
@@ -635,7 +995,7 @@ class LayerBody(object):
     Owner = None # reference to Layer object of which this LayerBody MAY be a part
     #Mold = None  # LayerMold that was used to generate this body SHOULD WE REALLY HAVE THIS ATTRIBUTE? ALL OF THE RELEVANT INFO SHOULD BE IN FaceListOrig
     Shape = None # OpenCascade TopoDS Shape which is a Solid which consists of a single closed shell which consists of multiple faces.
-    
+    fiberorientation = None
     # Constant
     StepModelType = STEPControl_ManifoldSolidBrep # Used for OpenCascade STEP writer
     
