@@ -14,6 +14,7 @@ from OCC.TopoDS import TopoDS_Compound
 from OCC.TopoDS import TopoDS_Wire
 from OCC.TopoDS import TopoDS_Vertex
 from OCC.TopoDS import TopoDS_Shell
+from OCC.TopoDS import TopoDS_Solid
 from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
 from OCC.TopoDS import topods_Edge
@@ -42,10 +43,12 @@ from OCC.TopAbs import TopAbs_FACE
 from OCC.TopAbs import TopAbs_VERTEX
 from OCC.TopAbs import TopAbs_EDGE
 from OCC.TopAbs import TopAbs_SHELL
+from OCC.TopAbs import TopAbs_SOLID
 from OCC.TopAbs import TopAbs_FORWARD
 from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
+from OCC.TopoDS import TopoDS_Iterator
 from OCC.GeomLProp import GeomLProp_SLProps
 from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
@@ -70,7 +73,32 @@ from OCC.STEPControl import STEPControl_GeometricCurveSet
 from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
-import loaders
+from . import loaders
+
+
+def OffsetFaceMoreAlongDirection(face, offsetDir, PointTolerance):
+    assert(offsetDir == 1 or offsetDir == -1)
+    OffsetDist = 1000.0 * PointTolerance * offsetDir
+
+    mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, OffsetDist, PointTolerance,
+                                                            BRepOffset.BRepOffset_Skin,
+                                                            False, False,
+                                                            GeomAbs_Arc)
+    assert (mkOffset.IsDone())
+
+    OffsetShell = mkOffset.Shape()
+
+    OffsetShellFacesExp = TopExp_Explorer(OffsetShell, TopAbs_FACE)
+    OffsetFaces = []
+
+    while OffsetShellFacesExp.More():
+        OffsetFaces.append(topods_Face(OffsetShellFacesExp.Current()))
+        OffsetShellFacesExp.Next()
+        pass
+
+    assert (len(OffsetFaces) == 1)  # Offset of a single face should give a single face
+
+    return OffsetFaces[0]
 
 
 def ProjectEdgesOntoFace(edge_edges, face):
@@ -170,7 +198,7 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
             angleIncrement = 1
             parIncrement = 0.01
             pointFound = False
-            for angle in xrange(0,359,angleIncrement):
+            for angle in range(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
                 newV = ClosestV + parIncrement * math.sin(angle*math.pi/180.0)
 
@@ -208,6 +236,43 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     return (np.array((facePoint.X(), facePoint.Y(), facePoint.Z()), dtype='d'),
              np.array((faceNormal.X(), faceNormal.Y(), faceNormal.Z()), dtype='d'),
              np.array((faceParPoint[0], faceParPoint[1]), dtype='d'))
+
+
+def OCCPointInFace(Point, Face, OrigPointTolerance):
+    """ Given a face and a Point check if point lies on the face"""
+
+    facePoint = gp_Pnt(Point[0],Point[1],Point[2])
+    # faceSurface = BRep_Tool().Surface(Face)
+    # SAS = ShapeAnalysis_Surface(faceSurface)
+    # currentUV = SAS.ValueOfUV(facePoint, OrigPointTolerance)
+    # parPointU = currentUV.X()
+    # parPointV = currentUV.Y()
+    # print(parPointU, parPointV)
+    #
+    #FaceExplorer = BRepClass_FaceExplorer(Face)
+    #C = BRepClass_FClassifier()
+    # C.Perform(FaceExplorer, gp_Pnt2d(parPointU, parPointV), OrigPointTolerance)
+
+    #C.Perform(Face, facePoint, OrigPointTolerance )
+
+    #return C.State()
+
+    # Find the closest point by this method
+    # https://www.opencascade.com/content/closest-point-step-object
+
+
+    origPointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(facePoint).Vertex()
+
+    DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPointVertex)
+    DistanceCalculator.Perform()
+    if not DistanceCalculator.IsDone():
+        raise ValueError("Point to face distance calculation failed")
+    currentDist = DistanceCalculator.Value()
+
+
+    if (currentDist < OrigPointTolerance):
+        return TopAbs_IN
+    return TopAbs_OUT
 
 
 def VectorNormalize(v):
@@ -471,6 +536,23 @@ class Layer(object):
 
         return [ Body.Name for Body in self.BodyList ]
 
+    def FindLayerBodyNameByPoint(self,Point,PointTolerance):
+        PointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(Point[0],Point[1],Point[2])).Vertex()
+
+        for Body in self.BodyList:
+
+            DistanceCalculator = BRepExtrema_DistShapeShape(Body.Shape, PointVertex)
+            DistanceCalculator.Perform()
+
+            if DistanceCalculator.NbSolution() > 0:
+                CurrentDist = DistanceCalculator.Value()
+                if CurrentDist < PointTolerance:
+                    return Body.Name
+                pass
+            pass
+        return None
+
+
     def OffsetMold(self):
         """Return a LayerMold based on the OFFSET side of this layer"""
         return LayerMold.FromFaceLists([ Body.FaceListOffset for Body in self.BodyList ])
@@ -481,148 +563,22 @@ class Layer(object):
         from this layer!) """
         return LayerMold.FromFaceLists([ Body.FaceListOrig for Body in self.BodyList ])
 
-    def SplitLayer(self, crackWireFile, Tolerance):
+    def Split(self, crackWireFile, Tolerance):
         """Split the layer using the crackWire outline"""
 
-        SideShapes=[]
-        # Load the CSV file of the splitting line and create a face between the ORIG and OFFSET faces of the layer
-        crack_wire_pt_list = []
-        with open(crackWireFile) as csvfile:
-            reader = csv.reader(csvfile, delimiter=',', quotechar='"')
-            for row in reader:
-                if len(row) != 3:
-                    raise ValueError("Malformed row in CSV file %s: %s" % (crackWireFile, ",".join(row)))
-                try:
-                    x = float(row[0])
-                    y = float(row[1])
-                    z = float(row[2])
-                    crack_wire_pt_list.append((x, y, z))
-                    pass
-                except ValueError:
-                    pass
+        ReplacementLayerBodyList = []
+        for LayerBody in self.BodyList:
+
+            newlayerbodies = LayerBody.Split(crackWireFile,Tolerance)
+
+            for newlayerbody in newlayerbodies:
+                newlayerbody.Owner = self
                 pass
+
+            ReplacementLayerBodyList.extend(newlayerbodies)
             pass
-
-        if len(crack_wire_pt_list) == 0:
-            raise ValueError("Could not parse any lines from CSV file %s" % (crackWireFile))
-
-        # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
-        crack_wirepointsHArray = TColgp_HArray1OfPnt(1, len(crack_wire_pt_list))
-
-        for pos in range(len(crack_wire_pt_list)):
-            current_point = gp_Pnt(crack_wire_pt_list[pos][0], crack_wire_pt_list[pos][1], crack_wire_pt_list[pos][2])
-            crack_wirepointsHArray.SetValue(pos + 1, current_point)
-            pass
-
-        # Interpolate the points to make a closed curve
-        interpAPI = GeomAPI_Interpolate(crack_wirepointsHArray.GetHandle(), False, Tolerance)
-        interpAPI.Perform()
-        if interpAPI.IsDone():
-            crack_curve = interpAPI.Curve()
-        else:
-            raise ValueError("Curve interpolation failed\n")
-
-        # Convert a curve to edge and then to Shape
-        crack_edge = BRepBuilderAPI_MakeEdge(crack_curve).Edge()
-        WireBuilder = BRepBuilderAPI_MakeWire()
-        WireBuilder.Add(crack_edge)
-        CrackWireShape = WireBuilder.Shape()
-
-        # step_writer2=STEPControl_Writer()
-        # step_writer2.Transfer(CrackWireShape,STEPControl_GeometricCurveSet,True)
-        # step_writer2.Write("../data/Wire.STEP")
-        #
-        # sys.modules["__main__"].__dict__.update(globals())
-        # sys.modules["__main__"].__dict__.update(locals())
-        # raise ValueError("Break")
-
-        exp = TopExp_Explorer(CrackWireShape, TopAbs_EDGE)
-
-        # Iterate over all edges
-        edge_shapes = []
-        while exp.More():
-            edge_shapes.append(exp.Current())
-
-            exp.Next()
-            pass
-        edge_edges = [topods_Edge(edge_shape) for edge_shape in edge_shapes]
-
-
-        # For now assume only one layer body.
-        # Get the offset and orig faces of the layer body and project the edge to both
-        offsetFace = self.BodyList[0].FaceListOffset[0].Face
-        origFace = self.BodyList[0].FaceListOrig[0].Face
-
-        ProjectionEdges_a = ProjectEdgesOntoFace(edge_edges, origFace)
-        ProjectionEdges_b = ProjectEdgesOntoFace(edge_edges, offsetFace)
-
-        # Generate faces connecting original and offset projected edges.
-        # We will use this as a tool to do the cut.
-
-        # For the moment assume only one edge
-
-        build = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
-        Perimeter = TopoDS_Compound()
-        build.MakeCompound(Perimeter)
-
-        wire_a = TopoDS_Wire()
-        build.MakeWire(wire_a)
-        wire_b = TopoDS_Wire()
-        build.MakeWire(wire_b)
-
-        for edgecnt in range(len(edge_edges)):
-            projectionedge_a = ProjectionEdges_a[edgecnt]
-            projectionedge_b = ProjectionEdges_b[edgecnt]
-
-            build.Add(wire_a, projectionedge_a)
-            build.Add(wire_b, projectionedge_b)
-            pass
-
-        # Generate side faces
-        SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
-        SideGenerator.AddWire(wire_a)
-        SideGenerator.AddWire(wire_b)
-        SideGenerator.Build()
-
-        if (not SideGenerator.IsDone()):
-            raise ValueError("Side face generation failed\n")
-
-        SideShape = SideGenerator.Shape()
-
-        build.Add(Perimeter, SideShape)
-        SideShapes.append(SideShape)
+        self.BodyList = ReplacementLayerBodyList
         pass
-
-        GASplitter = GEOMAlgo_Splitter()
-        GASplitter.AddArgument(self.BodyList[0].Shape)
-        for SideShape in SideShapes:
-            GASplitter.AddTool(SideShape)
-            pass
-
-        GASplitter.Perform()
-
-        # if (not GASplitter.IsDone()):
-        #    raise ValueError("Splitting face failed\n")
-
-        SplitBody = GASplitter.Shape()
-        # Hopefully this did not damage layerbodyface
-
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        #step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
-        #step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
-        step_writer2.Transfer(SplitBody,STEPControl_ManifoldSolidBrep,True)
-        step_writer2.Write("../data/allShapes.STEP")
-
-
-        # !!!*** Need to create two layerbodies, replacing the existing layerbody in the
-        # layer structure. Need to generate and sort LayerBodyFaces into all of the right places. 
-        #
-        # !!!*** Need API to provide points for a wire segment to do the splitting, 
-        # Need to connect the wire segment to the domain boundary
-        # Need to bond the region between segment and boundary
-        
-
 
 
 
@@ -795,8 +751,8 @@ class Layer(object):
             for MoldFace in Mold.FaceList: # Iterate over LayerBodyFaces in Mold
                 MoldFaceSurf=BRep_Tool.Surface(MoldFace.Face)
                 if MoldFaceSurf==FaceSurf: # Same underlying surface
-                    if MatchedInMold:
-                        raise ValueError("Same surface matched twice in mold (!?)")
+                    #if MatchedInMold:
+                    #    raise ValueError("Same surface matched twice in mold (!?)")  (this is actually OK)
                     MatchedInMold=True
                     pass
                 pass
@@ -1045,9 +1001,6 @@ class LayerBody(object):
         if not solidMaker.IsDone():
             raise ValueError("Solid maker failed")
 
-        #sys.modules["__main__"].__dict__.update(globals())
-        #sys.modules["__main__"].__dict__.update(locals())
-        #raise ValueError("Break")
         solidShape = solidMaker.Solid()
         
         if not BRepLib.breplib_OrientClosedSolid(solidShape):
@@ -1055,7 +1008,232 @@ class LayerBody(object):
         # We successfully got a closed solid
         self.Shape = solidShape
         pass
-    
+
+
+    def Split(self,crackWireFile,Tolerance):
+
+        # Load the CSV file of the splitting line and create a face between the ORIG and OFFSET faces of the layer
+        crack_wire_pt_list = []
+        with open(crackWireFile) as csvfile:
+            reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+            for row in reader:
+                if len(row) != 3:
+                    raise ValueError("Malformed row in CSV file %s: %s" % (crackWireFile, ",".join(row)))
+                try:
+                    x = float(row[0])
+                    y = float(row[1])
+                    z = float(row[2])
+                    crack_wire_pt_list.append((x, y, z))
+                    pass
+                except ValueError:
+                    pass
+                pass
+            pass
+
+        if len(crack_wire_pt_list) == 0:
+            raise ValueError("Could not parse any lines from CSV file %s" % (crackWireFile))
+
+        # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
+        crack_wirepointsHArray = TColgp_HArray1OfPnt(1, len(crack_wire_pt_list))
+
+        for pos in range(len(crack_wire_pt_list)):
+            current_point = gp_Pnt(crack_wire_pt_list[pos][0], crack_wire_pt_list[pos][1], crack_wire_pt_list[pos][2])
+            crack_wirepointsHArray.SetValue(pos + 1, current_point)
+            pass
+
+        # Interpolate the points to make a closed curve
+        interpAPI = GeomAPI_Interpolate(crack_wirepointsHArray.GetHandle(), False, Tolerance)
+        interpAPI.Perform()
+        if interpAPI.IsDone():
+            crack_curve = interpAPI.Curve()
+        else:
+            raise ValueError("Curve interpolation failed\n")
+
+        # Convert a curve to edge and then to Shape
+        crack_edge = BRepBuilderAPI_MakeEdge(crack_curve).Edge()
+        WireBuilder = BRepBuilderAPI_MakeWire()
+        WireBuilder.Add(crack_edge)
+        CrackWireShape = WireBuilder.Shape()
+
+        # step_writer2=STEPControl_Writer()
+        # step_writer2.Transfer(CrackWireShape,STEPControl_GeometricCurveSet,True)
+        # step_writer2.Write("../data/Wire.STEP")
+
+        exp = TopExp_Explorer(CrackWireShape, TopAbs_EDGE)
+
+        # Iterate over all edges
+        edge_shapes = []
+        while exp.More():
+            edge_shapes.append(exp.Current())
+
+            exp.Next()
+            pass
+        edge_edges = [topods_Edge(edge_shape) for edge_shape in edge_shapes]
+
+
+        # Get the offset and orig faces of the layer body and project the edge to both
+        # ***!!!! Really we should be iterating over FaceListOffset
+        # and FaceListOrig and finding correspondences.
+        # This is probably OK for most cases as long as
+        # offsetFace and origFace share the same underlying surface
+        # and we are just using these to create a tool
+        # that will be used to cut the body.
+
+        # There is an issue for curved faces when the tool does not completely extend beyond
+        # the top and bottom of the layer. To deal with such faces, we will offset the orig
+        # and offset faces in opposite directions to create a tool that is slightly bigger
+
+        offsetFace = self.FaceListOffset[0].Face
+        offsetOffsetFace = OffsetFaceMoreAlongDirection(offsetFace, 1, Tolerance)
+        origFace = self.FaceListOrig[0].Face
+        offsetOrigFace = OffsetFaceMoreAlongDirection(origFace, 1, Tolerance)
+
+        ProjectionEdges_a = ProjectEdgesOntoFace(edge_edges, offsetOffsetFace)
+        ProjectionEdges_b = ProjectEdgesOntoFace(edge_edges, offsetOrigFace)
+
+        # Generate faces connecting original and offset projected edges.
+        # We will use this as a tool to do the cut.
+
+        # For the moment assume only one edge
+
+        build = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+        Perimeter = TopoDS_Compound()
+        build.MakeCompound(Perimeter)
+
+        wire_a = TopoDS_Wire()
+        build.MakeWire(wire_a)
+        wire_b = TopoDS_Wire()
+        build.MakeWire(wire_b)
+
+        for edgecnt in range(len(edge_edges)):
+            projectionedge_a = ProjectionEdges_a[edgecnt]
+            projectionedge_b = ProjectionEdges_b[edgecnt]
+
+            build.Add(wire_a, projectionedge_a)
+            build.Add(wire_b, projectionedge_b)
+            pass
+
+        # Generate cutting tool face
+        CutToolGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
+        CutToolGenerator.AddWire(wire_a)
+        CutToolGenerator.AddWire(wire_b)
+        CutToolGenerator.Build()
+
+        if (not CutToolGenerator.IsDone()):
+            raise ValueError("CutTool generation failed\n")
+
+        CutToolShape = CutToolGenerator.Shape()
+
+        build.Add(Perimeter, CutToolShape)
+
+        GASplitter = GEOMAlgo_Splitter()
+        GASplitter.AddArgument(self.Shape)
+        GASplitter.AddTool(CutToolShape)
+        GASplitter.Perform()
+
+        # if (not GASplitter.IsDone()):
+        #    raise ValueError("Splitting face failed\n")
+
+        SplitBodies = GASplitter.Shape()
+
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(CutToolShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Transfer(self.Shape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer2.Transfer(SplitBodies,STEPControl_ManifoldSolidBrep,True)
+        #step_writer2.Write("../data/allShapes.STEP")
+
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Break")
+
+        # !!!*** Need to create two layerbodies, replacing the existing layerbody in the
+        # layer structure. Need to generate and sort LayerBodyFaces into all of the right places.
+
+
+        # Extract the bodies created after the split operation
+        bodyIterator = TopoDS_Iterator(SplitBodies)
+        bodyCount = 0
+        SplitBodyList=[]
+        while bodyIterator.More():
+            # Only consider edges
+            if bodyIterator.Value().ShapeType() == TopAbs_SOLID:
+                bodyCount += 1
+                SplitBodyList.append(bodyIterator.Value())
+                pass
+            bodyIterator.Next()
+            pass
+        # For each body extracted, find the faces and add them to the corresponding list
+        NewLayerBodies=[]
+        for (bodyNum, body) in enumerate(SplitBodyList):
+
+            NewLayerBody = LayerBody(Name="%s_Split%d" % (self.Name,bodyNum+1),
+                                     Shape=body)
+
+            # Extract faces and sort them into NewLayerBody.FaceListOrig, NewLayerBody.FaceListOffset, and NewLayerBody.FaceListSide
+
+            # Iterate over all faces
+            FaceExp = TopExp_Explorer(body, TopAbs_FACE)
+            while FaceExp.More():
+                # Extract the Surface object (geometry, not topology) underlying this face
+                tds_Face = topods_Face(FaceExp.Current())
+                FaceSurf = BRep_Tool.Surface(tds_Face)
+
+                # Search for this face in the mold
+                MatchedInOrig = False
+                for OrigFace in self.FaceListOrig:  # Iterate over LayerBodyFaces in pre-split LayerBody
+                    OrigFaceSurf = BRep_Tool.Surface(OrigFace.Face)
+                    if OrigFaceSurf == FaceSurf:  # Same underlying surface
+                        if MatchedInOrig:
+                            raise ValueError("Same surface matched twice in mold (!?)")
+                        MatchedInOrig = True
+                        pass
+                    pass
+
+                # Search for this face in the offset surface
+                MatchedInOffset = False
+                for OffsetFace in self.FaceListOffset:  # Iterate over LayerBodyFaces in pre-split LayerBody
+                    OffsetFaceSurf = BRep_Tool.Surface(OffsetFace.Face)
+                    if OffsetFaceSurf == FaceSurf:  # Same underlying surface
+                        if MatchedInOffset:
+                            raise ValueError("Same surface matched twice in offset (!?)")
+                        MatchedInOffset = True
+                        pass
+                    pass
+
+                # Since these faces are extracted from the generated
+                # closed object, that the normals generated in FromOCC()
+                # should be outward-facing and thus we don't need to
+                # provide an IsPointingInside lambda.
+
+                if MatchedInOrig and not (MatchedInOffset):
+                    # Create LayerBodyFace
+                    NewLayerBody.FaceListOrig.append(LayerBodyFace.FromOCC(tds_Face, "ORIG", Owner=NewLayerBody))
+                    pass
+                elif MatchedInOffset and not (MatchedInOrig):
+                    # Create LayerBodyFace
+                    NewLayerBody.FaceListOffset.append(LayerBodyFace.FromOCC(tds_Face, "OFFSET", Owner=NewLayerBody))
+                    pass
+                elif MatchedInOffset and MatchedInOrig:
+                    raise ValueError("Same surface matched in both offset and orig (!?)")
+                else:
+                    # Must be a side face
+                    # Create LayerBodyFace
+                    NewLayerBody.FaceListSide.append(LayerBodyFace.FromOCC(tds_Face, "OFFSET", Owner=NewLayerBody))
+                    pass
+                FaceExp.Next()
+                pass
+            NewLayerBodies.append(NewLayerBody)
+            pass
+        return NewLayerBodies
+
+
+    # !!!*** Need API to provide points for a wire segment to do the splitting,
+    # Need to connect the wire segment to the domain boundary
+    # Need to bond the region between segment and boundary
+
+
+
+
     pass
 
 
@@ -1270,12 +1448,13 @@ class LayerBodyFace(object): # Formerly LayerSurface
     # should be covered by Direction=="ORIG"
     Direction = None # "ORIG", "OFFSET", "SIDE", or "NODIR", representing the side of the Owning LayerBody which corresponds to this Face
 
-    Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part. ****!!!! NOTE: as of 2/8/19, not always updated when we do delamination splits!!!***
+    Owner = None # If this LayerBodyFace may be part of a LayerBody, this is the LayerBody of which it might be a part.
+    # ****!!!! NOTE: as of 2/8/19, not always updated when we do delamination splits!!!***
     
     BCType = None # Formerly DelaminationType: None, "NODELAM" "NOMODEL", "COHESIVE", "CONTACT" or, "TIE"
     # MatchingFace = None # Formerly SurfPair, This would be the matching LayerBodyFace in the adjacent (or non-adjacent)
-    # layer or stiffener, assigned by adjacent_layers() ... To maintain immutability of these objects suggest that
-    # instead of this attribute, have adjacent_layers() create a dictionary
+    # layer or stiffener, assigned by adjacent_layer_boundary_conditions() ... To maintain immutability of these objects suggest that
+    # instead of this attribute, have adjacent_layer_boundary_conditions() create a dictionary
     # that can be used to look up matching faces. 
 
     # StiffenerGenerated and StiffnerPaired members removed (should no longer be necessary)
@@ -1307,14 +1486,21 @@ class LayerBodyFace(object): # Formerly LayerSurface
         # 2nd imprint operation would give us another copy of the
         # geometry that would then not show pointer equivalence
         
-        ThisSurface = BRep_Tool().Surface(self.Face)
-        OtherSurface = BRep_Tool().Surface(other.Face)
+        #ThisSurface = BRep_Tool().Surface(self.Face)
+        #OtherSurface = BRep_Tool().Surface(other.Face)
         #print("ThisSurface=%s" % (str(ThisSurface)))
         #print("OtherSurface=%s" % (str(OtherSurface)))
         
         #print("Equality operator returns %s" % (str(ThisSurface.DumpToString() == OtherSurface.DumpToString())))
         
-        return ThisSurface.DumpToString() == OtherSurface.DumpToString()
+        #return ThisSurface.DumpToString() == OtherSurface.DumpToString() and self.Face.IsEqual(other.Face)
+
+
+        # Update: Use OpenCascade IsSame operator
+        # That tests for same underlying TShape (?) with same location but not necessarily orientation ... normal may be flipped.
+        return self.Face.IsSame(other.Face)
+
+
 
     # Implement not equal operator
     def __ne__(self,other):
@@ -1367,13 +1553,16 @@ if __name__=="__main__":
     Mold = LayerMold.FromFile(os.path.join("..","data","FlatMold3.STEP"))
     Layer1=Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",pointTolerance)
     Layer2=Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",pointTolerance)
+    Layer3=Layer.CreateFromMold("Layer 3",Layer2.OffsetMold(),2.0,"OFFSET",pointTolerance)
 
-    Layer1.SplitLayer(os.path.join("..","data","SplitLine.csv"), pointTolerance)
+    Layer2.Split(os.path.join("..","data","SplitLine.csv"), pointTolerance)
 
     step_writer=STEPControl_Writer()
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
-    step_writer.Write("../Data/Layers.step")
+    step_writer.Transfer(Layer2.BodyList[1].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Transfer(Layer3.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Write("../data/Layers.step")
 
     pass

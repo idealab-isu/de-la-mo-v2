@@ -839,7 +839,7 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
         sys.stderr.write("WARNING: Assuming region for sweep path is cells[0] (FIXME) and edge is edges[1]\n")
         # !!!*** ALSO need to add contact model for delaminated region across cohesive layer ***!!!
         #self.fe_part_meshing.NEED_TO_DETERMINE_SWEEP_PATH
-        self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=self.fe_part_meshing.edges[1],sense=SweepSense)
+        self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=self.fe_part_meshing.edges[5],sense=SweepSense)
         
         HexElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D8,elemLibrary=ElemLibrary)
         WedgeElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D6,elemLibrary=ElemLibrary)
@@ -1097,7 +1097,18 @@ class Layer(Assembly):
             pass
         
         pass
-   
+
+    def Split(self,splitpath_filename,PointTolerance):
+        self.gk_layer.Split(splitpath_filename,PointTolerance)
+        pass
+
+    def GetPartInstanceFaceRegionFromPoint(self,Point,PointTolerance):
+        # May only be called after finalization
+        gk_layerbodyname = self.gk_layer.FindLayerBodyNameByPoint(Point,PointTolerance)
+        part = self.parts[gk_layerbodyname]
+        region=part.GetInstanceFaceRegion(Point,PointTolerance) # get ABAQUS region
+        return region
+    
     @classmethod
     def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, split=None, coordsys=None):
         """Create a layer given creation parameters to be passed to the geometry kernel, a name, ABAQUS Section, 
@@ -1152,7 +1163,10 @@ layup direction, etc."""
 
 
     def Finalize(self,DM):
-        """Build Python and Finite Element structure for this layer based on geometry kernel structure"""
+        """Build Python and Finite Element structure for this layer based on geometry kernel structure.
+        It is not permissible to break a layer into pieces (multiple parts or bodies) after this 
+        finalize call. It IS permissible to do surface imprints that operate in-place on the existing 
+        layerbodies. """
         assert(self.parts is None) # this will fail if we try to finalize a second time
         self.parts=collections.OrderedDict()
 
@@ -1193,38 +1207,6 @@ layup direction, etc."""
         
         return cls(name=name,gk_layer=gk_layer,layupdirection=layup,LayerSection=Section,coordsys=coordsys)
 
-
-    
-    @classmethod
-    def CreateSplitLayer(cls,DM,priorlayer,direction,thickness,name,Section,layup,filename,coordsys=None):
-        """Create a split layer using a prior layer as a mold,.  
- * direction: delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION
- * thickness: Thickness of layer (offsetting operation)
- * name: Unique name for layer
- * Section: ABAQUS section fo the layer
- * layup: Ply orientation in degrees
- * coordsys: Reference coordinate system for layup"""
-        # ***!!!! OBSOLETE -- NEEDS REWORK
-        # Read doxygen-generated documentation for ModelBuilder class for details...
-        return cls.CreateFromParams(DM, (priorlayer, direction, thickness), name, Section, layup, filename,coordsys=coordsys)
-
-    @classmethod
-    def CreateStiffenerFromLayer(cls,DM,priorlayer,name,LayerSection,stiffenerfilename): # direction == OFFSET_DIRECTION is implicit
-        """Create a stiffner layer using a prior layer as a mold,.  
- * name: Unique name for layer
- * LayerSection: ABAQUS section fo the stiffener layer
- * stiffnerfilename: File with cross section of the stiffener."""
-        gk_layer=delamo.CADwrap.Layer()
-
-        # ***!!!! OBSOLETE -- NEEDS UPDATE
-        DM.modelbuilder.create_hat_stiffener(priorlayer,gk_layer,stiffenerfilename)
-
-        gk_layer.name(name)
-
-
-        
-        return cls(gk_layer=gk_layer,LayerSection=LayerSection)
-    
 
     
     pass
@@ -1663,14 +1645,14 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
 * DM: DelamoModeler object
 * layer1: First layer
 * layer2: Second layer
-* defaultBC: The boundary condition for the bonded zone: Generally delamo.CADwrap.BC_TIE, delamo.CADwrap.BC_COHESIVE, or delamo.CADwrap.BC_COHESIVE_LAYER
-* delamBC: The boundary condition for the bulk of the delaminated region(s). Generally delamo.CADwrap.BC_CONTACT
-* delamRingBC: The boundary condition for the outer zone of the delaminated region: Generally delamo.CADwrap.BC_NONE
+* defaultBC: The boundary condition for the bonded zone: Generally "TIE", "COHESIVE", or "COHESIVE_LAYER"
+* delamBC: The boundary condition for the bulk of the delaminated region(s). Generally  "CONTACT"
+* delamRingBC: The boundary condition for the outer zone of the delaminated region: Generally "NONE"
 * CohesiveInteraction: The ABAQUS interaction property for any cohesive portions of the bond
 * ContactInteraction: The ABAQUS interaction property for any contact portions of the bond
 * delaminationlist: A list of files with delamination outlines (loops of 3D coordinates)
 * master_layer: A preference for which layer should be the master layer in ABAQUS
-* cohesive_layer: If defaultBC==delamo.CADwrap.BC_COHESIVE_LAYER, this layer will be used to achieve the bond. The cohesive_layer should have finite thickness but should NOT be finalized (this routine will finalize the cohesive_layer). You will also need to mesh the cohesive_layer using MeshCohesive()
+* cohesive_layer: If defaultBC=="COHESIVE_LAYER", this layer will be used to achieve the bond. The cohesive_layer should have finite thickness but should NOT be finalized (this routine will finalize the cohesive_layer). You will also need to mesh the cohesive_layer afterward using MeshCohesive()
 * delamo_sourceline: An index of the line number of this bond_layers() call, used to distinguish between mulitiple bonding steps. 
 * delamo_phase: Phase of this multi-step defect insertion process. 
 * delamo_basename: Base directory name for creation of layer boundary (STL) meshes. 
@@ -1683,46 +1665,55 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         # This is really two bonding operations one between layer1 and cohesive_layer,
         # and one between layer2 and cohesive_layer
 
-        # ***!!!! This part NEEDS UPDATE
-        
         if cohesive_layer is None:
             raise ValueError("When bonding layers with a cohesive layer, you must have explicitly created the cohesive layer and passed it as the cohesive_layer parameter")
+
         if delaminationlist is not None:
+        
+            # Split cohesive layer according to the delaminations
             for cnt in range(len(delaminationlist)):
-                DM.modelbuilder.split_layer(cohesive_layer.gk_layer,delaminationlist[cnt])
+                cohesive_layer.Split(delaminationlist[cnt],DM.abqpointtolerance)
                 pass
             pass
-        #import pdb
-        #pdb.set_trace()
+
+        # Finalize the cohesive layer now that it has been split
+        cohesive_layer.Finalize(DM)
 
         #import pdb
         #pdb.set_trace()
-        face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,cohesive_layer.gk_layer,gk_delaminationlist,delamo.CADwrap.BC_TIE,delamo.CADwrap.BC_CONTACT,delamo.CADwrap.BC_NONE) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
+
+        if delaminationlist is not None:
+            DM.modelbuilder.apply_delaminations(layer1.gk_layer,cohesive_layer.gk_layer,delaminationlist) # Imprint faces on both sides, 
+            pass
+        
+
+        # return adjacent layers in face_adjacency_list
+        face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,cohesive_layer.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })  
+        
         # Find delamination region from FAL so cohesive_layer is removed in this region
         for face_adjacency in face_adjacency_list:
-            if face_adjacency["bcType"]==delamo.CADwrap.Delamination_NOMODEL or face_adjacency["bcType"]==delamo.CADwrap.Delamination_CONTACT:
-                name_to_remove=face_adjacency["name2"] # name2 because cohesive_layer was 2nd parameter to adjacent_layers
-                cohesive_layer_bodynames=cohesive_layer.gk_layer.bodynames()
+            if face_adjacency["bcType"]=="NONE" or face_adjacency["bcType"]=="CONTACT":
+                name_to_remove=face_adjacency["name2"] # name2 because cohesive_layer was 2nd parameter to adjacent_layer_boundary_conditions
+                cohesive_layer_bodynames=[ layerbody.Name for layerbody in cohesive_layer.gk_layer.BodyList ]
                 for cnt in range(len(cohesive_layer_bodynames)):
                     if cohesive_layer_bodynames[cnt]==name_to_remove:
-                        cohesive_layer.gk_layer.remove(cnt)
+                        # Remove body from layer. This is OK because Layers are mutable
+                        del cohesive_layer.gk_layer.BodyList[cnt] 
                         break
                     pass
                 pass
             pass
         
-        # Finalize the cohesive layer now that it has been split
-        cohesive_layer.Finalize(DM)
-        
+        # Now call ourselves to create TIE bond between layer1 and cohesive_layer, except in the delaminated region
 
-        bond_layers(DM,layer1,cohesive_layer,defaultBC=delamo.CADwrap.BC_DEFAULT_TIE,delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer1,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
-
-        
-        face_adjacency_list = DM.modelbuilder.adjacent_layers(cohesive_layer.gk_layer,layer2.gk_layer,gk_delaminationlist,delamo.CADwrap.BC_TIE,delamo.CADwrap.BC_CONTACT,delamo.CADwrap.BC_NONE) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
-        
-        bond_layers(DM,cohesive_layer,layer2,defaultBC=delamo.CADwrap.BC_TIE,delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer2,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
+        # BCTypes have already been written to layer1 and cohesive_layer by adjacent_layer_boundary_conditions() call above
+        bond_layers(DM,layer1,cohesive_layer,defaultBC="TIE",delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer1,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
 
         
+        
+        # Now call ourselves to create TIE bond between cohesive_layer and layer2, even in the delaminated region
+        # because CONTACT/NONE will exist between layer1 and cohesive_layer
+        bond_layers(DM,cohesive_layer,layer2,defaultBC="TIE",delamBC="TIE",delamRingBC="TIE",CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer2,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
         
         return
 
@@ -1732,7 +1723,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         
     #face_adjacency_list = delamo.CADwrap.FAL()
     #if delaminationlist is None:
-    #face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,defaultBC) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
+    #face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,defaultBC) # Imprint faces on both sides, return adjacent layers in face_adjacency_list
     #    pass
     #else:
 
@@ -1741,7 +1732,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         pass
     
 
-    face_adjacency_list = DM.modelbuilder.adjacent_layers(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
+    face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
     
 
     # Can not bond non-existant objects

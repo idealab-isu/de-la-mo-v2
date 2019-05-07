@@ -13,15 +13,19 @@ from OCC.TopoDS import TopoDS_Shell
 from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
 from OCC.TopoDS import topods_Edge
+from OCC.TopoDS import topods_Wire
 from OCC.BRep import BRep_Builder
 from OCC.BRep import BRep_Tool
 from OCC.BRepExtrema import BRepExtrema_DistShapeShape
 from OCC import BRepLib
 from OCC import BRepOffsetAPI
 from OCC import BRepOffset
+from OCC.Geom import Geom_OffsetCurve
+from OCC.Geom import Geom_Curve
 from OCC import BRepBuilderAPI
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
+from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 #from OCC.BRepClass import BRepClass_FacePassiveClassifier
 from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
@@ -38,14 +42,18 @@ from OCC.TopAbs import TopAbs_SHELL
 from OCC.TopAbs import TopAbs_FORWARD
 from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
+from OCC.GeomAbs import GeomAbs_Intersection
 from OCC.Geom import Geom_Line
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
+from OCC.TopTools import TopTools_ListOfShape
 from OCC.GeomLProp import GeomLProp_SLProps
 from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
 from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
 from OCC.GEOMAlgo import GEOMAlgo_Splitter
+from OCC.Geom2d import Geom2d_Curve
+from OCC.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCC import GeomProjLib
 from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
@@ -56,13 +64,71 @@ from OCC.STEPControl import STEPControl_Writer
 from OCC.STEPControl import STEPControl_ManifoldSolidBrep
 from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel,STEPControl_GeometricCurveSet
 
-from layer import LayerBody,LayerBodyFace
+from .layer import LayerBody,LayerBodyFace
+from .layer import OCCPointInFace
 
-import loaders
-import layer
+from . import loaders
+from . import layer
 
 
+def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBodyFaceList,PointTolerance):
+    """ImprintedFaces are faces from a "Fuse" operation, that are equivalent to or subfaces of
+    elements in the LayerBodyFaceList. This function identifies all matching faces in the LayerBodyFaceList
+    corresponding to all ImprintedFaces, and performs  replacement of the LayerBodyFaceList
+    elements, with one or more elements from ImprintedFaces replacing each matched entry in LayerBodyFaceList.
+    Returns the updated LayerBodyFaceList """
 
+
+    AddToLayerBodyFaceList=[]
+    RemoveFromLayerBodyFaceListIndices=set([])
+    for faceShape in ImprintedFaces:
+        layerBodyFace = LayerBodyFace.FromOCC(topods_Face(faceShape),"OFFSET")
+
+        #print("Imprint: Face of %s: Got point %s" % (LayerBodyFaceList[0].Owner.Name,str(layerBodyFace.Point)))
+
+        
+        # Loop through all faces in this list
+        for layer1BodyFaceIndex in range(len(LayerBodyFaceList)):
+            layer1BodyFace=LayerBodyFaceList[layer1BodyFaceIndex]
+            
+            # Check if the reference point from fused face matches any other face
+            pointClassification = OCCPointInFace(layerBodyFace.Point, layer1BodyFace.Face,PointTolerance)
+            #print(pointClassification, TopAbs_IN, TopAbs_OUT, TopAbs_ON)
+            #print("Face of %s: pointClassification=%d" % (LayerBodyFaceList[layer1BodyFaceIndex].Owner.Name,pointClassification))
+            if (pointClassification == TopAbs_IN):
+                
+                #if (layerBodyFace.Point[0] >-5.94 and layerBodyFace.Point[0] <-5.93):
+                #    print("Got troublesome point")
+                #    if "Split2" in LayerBodyFaceList[layer1BodyFaceIndex].Owner.Name:
+                #        print("writing debug.step")
+                #        step_writer=STEPControl_Writer()
+                #        step_writer.Transfer(layerBodyFace.Face,STEPControl_ShellBasedSurfaceModel,True)
+                #        step_writer.Transfer(layer1BodyFace.Face,STEPControl_ShellBasedSurfaceModel,True)
+                #        step_writer.Write('/tmp/debug.step')
+                #
+                #        pass
+                
+                #print("Found a matched face in %s "%layer1BodyFace.Owner.Name)
+                layerBodyFace.Direction = layer1BodyFace.Direction
+                layerBodyFace.Owner = layer1BodyFace.Owner
+                layerBodyFace.BCType = layer1BodyFace.BCType
+                AddToLayerBodyFaceList.append(layerBodyFace)
+                RemoveFromLayerBodyFaceListIndices.add(layer1BodyFaceIndex)
+                pass
+            
+            pass
+        
+        pass
+
+    ReturnFaceList=copy.copy(LayerBodyFaceList)
+    # Go through RemoveFromLayerBodyFaceListIndices from largest to smallest, removing them
+    for RemoveIndex in sorted(RemoveFromLayerBodyFaceListIndices,reverse=True):
+        del ReturnFaceList[RemoveIndex]
+        pass
+
+    # Add in all the faces to be added
+    ReturnFaceList.extend(AddToLayerBodyFaceList)
+    return ReturnFaceList
 
 class OCCModelBuilder(object):
     """The OCCModelBuilder contains global parameters 
@@ -208,6 +274,32 @@ class OCCModelBuilder(object):
         #     with common geometry from both sides. The outcome should include all faces
         #     imprinted        
 
+        # we created imprint_layers
+        # that will imprint faces from lb1 onto lb2 and vice versa,
+        # and then rebuilds the layerbodies of both lb1 and lb2 
+        #
+        # It current does this based on the assumption that the underlying geometries
+        # of lb1 and lb2 come from the same source (same underlying surface object)
+        # It might be better to do this by first comparing geometry, then
+        # doing a rigorous equality comparison via edges and vertices (as described above).
+        # In any case, it 
+        # takes all faces from layerbody1 that share and underlying surface with layerbody2
+        # and all of those faces from layerbody2, Then performing a fuse operation, yielding 
+        # a large number of pieces. Then it reconstructs layerbodies 1 and 2 from the correct
+        # subpieces. A correct subpiece is one that, given a non-boundary point on the subpiece,
+        # the point lies inside a pre-existing face of that layerbody
+        #
+        # Then imprint_layers updates the face lists accordingly and sews the correct subpieces
+        # back together into the layerbody.
+        #
+
+        # eval_face_pairs that assumes
+        # and SHOULD check that faces are properly imprinted against each
+        # other 
+        # *!!!*** TODO: Check that all faces are properly imprinted
+
+
+        
         FaceListTotal1 = layerbody1.FaceListOrig + layerbody1.FaceListOffset + layerbody1.FaceListSide
         FaceListTotal2 = layerbody2.FaceListOrig + layerbody2.FaceListOffset + layerbody2.FaceListSide
         
@@ -251,7 +343,7 @@ class OCCModelBuilder(object):
         # split (which they aren't from this function)
 
 
-        SideShapes=[]
+        ToolShapes=[]
         
         for delam_outline in delam_outlines:
             # ***!!! Temporarily load curve rather than constructing wire from delamination outline
@@ -304,10 +396,21 @@ class OCCModelBuilder(object):
             WireShape = WireBuilder.Shape()
             assert(WireShape.Closed())
 
+            # Offset wire to create no model shape
+
+            # Offset the tool shape to create the inner tool shape for the no model zone
+            #NoModelDist = -1
+            #mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffset(topods_Wire(WireShape), GeomAbs_Arc, False)
+            #mkOffset.Perform(NoModelDist)
+
+            #assert (mkOffset.IsDone())
+            #WireInShape = mkOffset.Shape()
+
             #step_writer2=STEPControl_Writer()
             #step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
-            #step_writer2.Write("../data/Wire.STEP")
-            #
+            #step_writer2.Transfer(WireInShape,STEPControl_GeometricCurveSet,True)
+            #step_writer2.Write("../data/allShapes.STEP")
+
             #sys.modules["__main__"].__dict__.update(globals())
             #sys.modules["__main__"].__dict__.update(locals())
             #raise ValueError("Break")
@@ -331,6 +434,25 @@ class OCCModelBuilder(object):
             
             ProjectionEdges_a = self.ProjectEdgesOntoFace(edge_edges,bounding_face_a)
             ProjectionEdges_b = self.ProjectEdgesOntoFace(edge_edges,bounding_face_b)
+
+            # Project the curve on to the face to figure out the parametric curve
+            ProjectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
+
+            # Evaluate points on projected curve and evaluate the parametric points
+            for edgecnt in range(len(edge_edges)):
+                projectionEdge = ProjectionEdges[edgecnt]
+                curveParPts = []
+                (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(projectionEdge, layerbodyface.Face)
+                curve = curveHandle.GetObject()
+                print(parStart, parEnd)
+                for u in [x * (1.0/100.0) for x in range(0, 100)]:
+                    curvePoint = curve.Value(u)
+                    curveParPts.append(curvePoint)
+
+
+            step_writer2=STEPControl_Writer()
+            step_writer2.Transfer(ProjectionEdge,STEPControl_GeometricCurveSet,True)
+            step_writer2.Write("../data/allShapes.STEP")
 
             # Generate faces connecting original and projected edges.
             # We will use this as a tool to do the cut. 
@@ -356,25 +478,46 @@ class OCCModelBuilder(object):
                 pass
             
             # Generate side faces
-            SideGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
-            SideGenerator.AddWire(wire_a)
-            SideGenerator.AddWire(wire_b)
-            SideGenerator.Build()
+            ToolGenerator = BRepOffsetAPI.BRepOffsetAPI_ThruSections()
+            ToolGenerator.AddWire(wire_a)
+            ToolGenerator.AddWire(wire_b)
+            ToolGenerator.Build()
             
-            if (not SideGenerator.IsDone()):
-                raise ValueError("Side face generation failed\n")
+            if (not ToolGenerator.IsDone()):
+                raise ValueError("Tool side face generation failed\n")
         
-            SideShape = SideGenerator.Shape()
-            
-            build.Add(Perimeter,SideShape)
-            SideShapes.append(SideShape)
+            ToolShape = ToolGenerator.Shape()
+
+            build.Add(Perimeter,ToolShape)
+            ToolShapes.append(ToolShape)
+
+            # Offset the tool shape to create the inner tool shape for the no model zone
+
+            NoModelDist = 1
+            mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, NoModelDist, self.PointTolerance,
+                                                                   BRepOffset.BRepOffset_Skin,
+                                                                   False, False,
+                                                                   GeomAbs_Arc)
+
+            assert (mkOffset.IsDone())
+            NoModelToolShape = mkOffset.Shape()
+
+            step_writer2=STEPControl_Writer()
+            step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            step_writer2.Write("../data/allShapes.STEP")
+
+            sys.modules["__main__"].__dict__.update(globals())
+            sys.modules["__main__"].__dict__.update(locals())
+            raise ValueError("Break")
+
             pass
         
             
         GASplitter=GEOMAlgo_Splitter()
         GASplitter.AddArgument(topods_Face(layerbodyface.Face))
-        for SideShape in SideShapes:
-            GASplitter.AddTool(SideShape)
+        for ToolShape in ToolShapes:
+            GASplitter.AddTool(ToolShape)
             pass
         
         GASplitter.Perform()
@@ -382,7 +525,7 @@ class OCCModelBuilder(object):
         #if (not GASplitter.IsDone()):
         #    raise ValueError("Splitting face failed\n")
 
-        SplitFace= GASplitter.Shape()
+        SplitFace = GASplitter.Shape()
         # Hopefully this did not damage layerbodyface
         
         #step_writer2=STEPControl_Writer()
@@ -397,16 +540,18 @@ class OCCModelBuilder(object):
         numsplitfaces = 0
         split_face_shapes=[]
         split_layerbodyfaces=[]
-        step_writer = STEPControl_Writer()
+        #step_writer = STEPControl_Writer()
 
         while split_face_exp.More():
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
-            step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
+            #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
 
             split_face = topods_Face(split_face_shape)
             (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
-            
+
+            #print("Delam: Face of %s: Got point %s" % (layerbodyface.Owner.Name,str(Point)))
+
             split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
                                                       Point=Point,
                                                       Normal=Normal,
@@ -419,8 +564,6 @@ class OCCModelBuilder(object):
 
             split_face_exp.Next()
             pass
-        step_writer.Write("/tmp/split_faces.step")
-
         print("Number of split faces %d"%(numsplitfaces))
 
         # split_face_shapes now should have two or more faces (TopoDS_Shape of type Face
@@ -448,16 +591,48 @@ class OCCModelBuilder(object):
                 layerbody.FaceListOffset.append(split_layerbodyface)
                 pass
             pass
-        
-        
 
         # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
-        
+
+        # Create a reference face using the ProjectionEdges and layerbodyface.Face
+        # Project the outline onto the face to figure out Boundary Conditions
+        projectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
+
+        #Make wire from edges
+        WireBuilder = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+        WirePerimeter = TopoDS_Compound()
+        WireBuilder.MakeCompound(WirePerimeter)
+
+        delamWire = TopoDS_Wire()
+        WireBuilder.MakeWire(delamWire)
+
+        for edgecnt in range(len(edge_edges)):
+            projectionEdge = projectionEdges[edgecnt]
+            WireBuilder.Add(delamWire, projectionEdge)
+            pass
+
+        delamSurface = BRep_Tool.Surface(layerbodyface.Face)
+        FaceBuilder = BRepBuilderAPI_MakeFace(delamSurface, self.PointTolerance)
+        delamFace = FaceBuilder.Face()
+        FaceBuilder.Add(delamWire)
+
+        error = FaceBuilder.Error()
+        print("Error : %d"%(error))
+        #if (error != BRepBuilderAPI_Error.BRepBuilderAPI_FaceDone):
+        #    print("Face generation failed!")
+
+        step_writer2=STEPControl_Writer()
+        step_writer2.Transfer(delamFace,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Transfer(delamWire,STEPControl_GeometricCurveSet,True)
+        step_writer2.Write("../data/allShapes.STEP")
+
+
+        sys.modules["__main__"].__dict__.update(globals())
+        sys.modules["__main__"].__dict__.update(locals())
+        raise ValueError("Break")
+
         # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
 
-        #sys.modules["__main__"].__dict__.update(globals())
-        #sys.modules["__main__"].__dict__.update(locals())
-        #raise ValueError("Break")
 
         layerbody.Rebuild_Shape()
         
@@ -481,12 +656,18 @@ class OCCModelBuilder(object):
         When done, rerun eval_face_pairs and use the resulting dictionary to construct and 
         return a face adjacency list (FAL)"""
 
+        self.imprint_layers(layer1,layer2) # make sure that layers are imprinted against each other
+
         for lb1cnt in range(len(layer1.BodyList)):
             lb1=layer1.BodyList[lb1cnt]
 
             for lb2cnt in range(len(layer2.BodyList)):
                 lb2=layer2.BodyList[lb2cnt]
-                
+
+                # !!!*** modify eval_face_pairs into match_face_pairs
+                # that will imprint faces from lb1 onto lb2 and vice versa,
+                # and then return a dictionary indexed by the face in lb1
+                # of the corresponding imprinted face in lb2
                 CommonFaces=self.eval_face_pairs(lb1,lb2)
 
                 for CommonFace in CommonFaces:
@@ -500,17 +681,187 @@ class OCCModelBuilder(object):
                 pass
             pass
         pass
-    
-    def adjacent_layers(self,layer1,layer2,bc_map=None):
-        """ Once adjacent_layers() is called, the LayerBody's in EITHER layer can't be split
+
+    def imprint_layers(self,layer1,layer2):
+        """ Imprint the layerbodies of layer1 and layer2 onto each other
+        First find all faces that share a common surface
+        Perform Boolean Fuse operation on the faces
+        Sort the faces based on underlying layerbody
+        Reconstruct the layerbody and replace them in the layer
+        """
+        # Reconstruct layerbodies 1 and 2 from the correct
+        # subpieces. A correct subpiece is one that, given a non-boundary point on the subpiece,
+        # the point lies inside a pre-existing face of that layerbody
+        #
+        # Then the correct subpieces can be sewn back together into the layerbody,
+        # and the face lists updates accordingly.
+
+        # ASSUMPTION: layer1 offset faces are fused to layer 2 orig faces
+
+        #layer1FaceList = TopTools_ListOfShape()
+        #layer2FaceList = TopTools_ListOfShape()
+
+        layer1FaceList=[]
+        layer2FaceList=[]
+        for LB in layer1.BodyList:
+            for LayerBodyFaceList in [ LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side?
+                layer1FaceList.extend(LayerBodyFaceList)
+                #for LayerBodyFace in LayerBodyFaceList:
+                #    layer1FaceList.Append(LayerBodyFace.Face)
+                #    pass
+                pass
+            pass
+
+        for LB in layer2.BodyList:
+            for LayerBodyFaceList in [ LB.FaceListOrig, LB.FaceListOffset, LB.FaceListSide]: # Do we really need side? 
+                layer2FaceList.extend(LayerBodyFaceList)
+                #for LayerBodyFace in LayerBodyFaceList:
+                #    layer2FaceList.Append(LayerBodyFace.Face)
+                #    pass
+                pass            
+            pass
+
+        # Find faces with matched underlying surfaces...
+        # (This can potentially be eliminated but it will
+        # make the operation very slow)
+
+        FusedFaces=[]
+        
+        SurfaceDict1={}
+        for face in layer1FaceList:
+            # OpenCascade surface provides a DumpToString method
+            # that gives a (presumably unique) identification of the
+            # underlying surface. The string is hashable, so usable
+            # as a dictionary key
+            key = BRep_Tool().Surface(face.Face).DumpToString()
+
+            if key not in SurfaceDict1:
+                SurfaceDict1[key]=[]
+                pass
+            
+            SurfaceDict1[key].append(face.Face)
+            pass
+        
+        SurfaceDict2={}
+        for face in layer2FaceList:
+            # OpenCascade surface provides a DumpToString method
+            # that gives a (presumably unique) identification of the
+            # underlying surface. The string is hashable, so usable
+            # as a dictionary key
+            key = BRep_Tool().Surface(face.Face).DumpToString()
+
+            if key not in SurfaceDict2:
+                SurfaceDict2[key]=[]
+                pass
+            
+            SurfaceDict2[key].append(face.Face)
+            pass
+
+        for surfacekey in SurfaceDict1:
+            if surfacekey in SurfaceDict2:
+                # Found surface with faces both in layer 1 and 2
+                layer1surfacefaces = TopTools_ListOfShape()
+                for face in SurfaceDict1[surfacekey]:
+                    layer1surfacefaces.Append(face)
+                    pass
+                
+                layer2surfacefaces = TopTools_ListOfShape()
+                for face in SurfaceDict2[surfacekey]:
+                    layer2surfacefaces.Append(face)
+                    pass
+ 
+                
+                # Fuse operation on all faces.
+                fuser = BRepAlgoAPI_Fuse()
+                fuser.SetArguments(layer1surfacefaces)
+                fuser.SetTools(layer2surfacefaces)
+                fuser.Build()
+                fusedShape = fuser.Shape()
+                # Separate out the faces from the fusedShape and add
+                # to FusedFaces
+
+                topExplorer = TopExp_Explorer(fusedShape, TopAbs_FACE)
+
+                # iterate over pieces of the original wire
+                while topExplorer.More():
+                    FusedFaces.append(topExplorer.Current())
+                    topExplorer.Next()
+                    pass
+
+                pass
+            pass
+
+        # !!!*** Need to loop through fused faces, and use them to
+        # replace faces in layerbodies of layer1 and layer2
+        # based on finding identification for the new faces and
+        # testing whether that identification works on old faces.
+        # ... Then replace the old faces with identified new faces.
+
+        for LB in layer1.BodyList:
+            LB.FaceListOrig=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOrig,self.PointTolerance)
+            LB.FaceListOffset=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOffset,self.PointTolerance)
+            LB.FaceListSide=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListSide,self.PointTolerance)
+
+            
+            # Rebuild layerbody from faces
+            LB.Rebuild_Shape()
+            
+
+            pass
+
+        for LB in layer2.BodyList:
+            LB.FaceListOrig=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOrig,self.PointTolerance)
+            LB.FaceListOffset=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListOffset,self.PointTolerance)
+            LB.FaceListSide=ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(FusedFaces,LB.FaceListSide,self.PointTolerance)
+
+            
+            # Rebuild layerbody from faces
+            LB.Rebuild_Shape()
+            
+
+            pass
+
+
+        
+        pass
+
+
+
+
+
+        #step_writer=STEPControl_Writer()
+        #step_writer.Transfer(layer1OffsetFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer.Transfer(layer2OrigFaceList[0].Face,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer.Transfer(fusedShape,STEPControl_ShellBasedSurfaceModel,True)
+        #for shape in FusedFaces:
+        #    step_writer.Transfer(shape,STEPControl_ShellBasedSurfaceModel,True)
+        #    pass
+        
+        #step_writer.Write("../data/fusedFace.STEP")
+        
+        #sys.modules["__main__"].__dict__.update(globals())
+        #sys.modules["__main__"].__dict__.update(locals())
+        #raise ValueError("Break")
+
+
+
+
+
+        pass
+
+    def adjacent_layer_boundary_conditions(self,layer1,layer2,bc_map=None):
+        """ Once adjacent_layer_boundary_conditions() is called, the LayerBody's in EITHER layer can't be split
         anymore -- because then they might need new names,
         and the return values contain the layer body names that will be used
-        to apply the boundary conditions"""
-        
+        to apply the boundary conditions. Returns the face adjacency list"""
+
         FAL = [] # Face Adjacency List
-        
+
+        self.imprint_layers(layer1,layer2)  # imprint_layers operates on the full layers because the bodies might be
+        # subdivided differently on both sides
         for lb1 in layer1.BodyList:
             for lb2 in layer2.BodyList:
+                #print("lb1 = %s; lb2=%s" % (lb1.Name,lb2.Name))
                 FacePairs=self.eval_face_pairs(lb1,lb2)
                 for postimprint_CommonFace in FacePairs:
                     BCType=postimprint_CommonFace.BCType
@@ -525,6 +876,13 @@ class OCCModelBuilder(object):
                         # apply user-supplied BC mapping
                         BCType=bc_map[BCType]
                         pass
+                    
+                    print ("Appending to FAL: %s" % ({ "name1": lb1.Name,
+                                                       "name2": lb2.Name,
+                                                       "bcType": BCType,
+                                                       "point1": postimprint_CommonFace.Point,
+                                                       "normal1": postimprint_CommonFace.Normal,}))
+                    
                     FAL.append( { "name1": lb1.Name,
                                   "name2": lb2.Name,
                                   "bcType": BCType,
@@ -572,25 +930,34 @@ class OCCModelBuilder(object):
 if __name__=="__main__":
     MB=OCCModelBuilder(PointTolerance=1e-5,NormalTolerance=1e-6)
     
+    pointTolerance = 1e-6
     Mold = layer.LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
     #Mold = layer.LayerMold.FromFile(os.path.join("..","data","FlatMold3.STEP"))
-    Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",1e-6)
+    Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"OFFSET",pointTolerance)
     #Layer1=layer.Layer.CreateFromMold("Layer 1",Mold,2.0,"ORIG",1e-6)
-    Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",1e-6)
+    Layer2=layer.Layer.CreateFromMold("Layer 2",Layer1.OffsetMold(),2.0,"OFFSET",pointTolerance)
     #Layer2=layer.Layer.CreateFromMold("Layer 2",Mold,2.0,"OFFSET",1e-6)
+    Layer3=layer.Layer.CreateFromMold("Layer 3",Layer2.OffsetMold(),2.0,"OFFSET",pointTolerance)
+
+    #Layer2.Split(os.path.join("..","data","SplitLine2.csv"), pointTolerance)
+
 
     #delaminationlist = [ ]
     delaminationlist = [ os.path.join("..","data","nasa-delam12-1.csv"), os.path.join("..","data","nasa-delam12-2.csv") ]
 
+    #MB.imprint_layers(Layer1, Layer2)
+    #MB.imprint_layers(Layer2, Layer3)
     #defaultBCType = 2
-    #FAL = MB.adjacent_layers(Layer1,Layer2,defaultBCType)
-    MB.apply_delaminations(Layer1,Layer2,delaminationlist)
+    #FAL = MB.adjacent_layer_boundary_conditions(Layer1,Layer2,defaultBCType)
+    #MB.apply_delaminations(Layer1,Layer2,delaminationlist)
 
 
     step_writer=STEPControl_Writer()
     
     step_writer.Transfer(Layer1.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Transfer(Layer2.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
+    #step_writer.Transfer(Layer2.BodyList[1].Shape,STEPControl_ManifoldSolidBrep,True)
+    step_writer.Transfer(Layer3.BodyList[0].Shape,STEPControl_ManifoldSolidBrep,True)
     step_writer.Write(os.path.join("..","data","Layers.step"))
 
     pass

@@ -36,7 +36,7 @@ DM=DelamoModeler.Initialize(globals(),
 # to be "ORIGINAL"
 (script_to_generate,
  cad_file_path_from_script,
- layer_boundary_template) = process.output_filenames("01_Planar_Single_Delam",phase="ORIGINAL")
+ layer_boundary_template) = process.output_filenames("01_Curved_Single_Delam",phase="ORIGINAL")
 
 # When writing a DeLaMo script, you start by creating a 
 # finite element initialization script. This is a 

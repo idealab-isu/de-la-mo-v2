@@ -8,6 +8,12 @@ import subprocess
 import platform
 import glob
 
+try:
+    input = raw_input  # python 2 compatibility
+    pass
+except NameError:
+    pass
+
 if len(sys.argv) < 2:
     print("Usage:   %s <original_script_name.py>" % (sys.argv[0]))
     sys.exit(0)
@@ -53,8 +59,8 @@ if os.path.split(scriptdir)[1]=="scripts":
 
 
 from delamo import process
-from delamo import processor
-
+#from delamo import processor
+processor = process.processor
 
 
 (process_name,process_phases) = process.get_process_phases(original_script_name)
@@ -89,7 +95,9 @@ while True:
           "                               run its job to be useful) \n"+
           "               FEINTERACT <phase> (Execute finite element script interactively)\n"+
           "               QUIT\n")
-    fullcommand = raw_input(" Enter command --> ")
+
+    
+    fullcommand = input(" Enter command --> ")
 
     print("")
     
@@ -119,6 +127,14 @@ while True:
 
     
     if command.upper() == "GENERATE" or command.upper()=="GEN":
+        if process.processor.original_to_predamage_tree is None:
+            # process failed to import redbaron
+            
+            print("redbaron not available: Cannot run GENERATE step")
+            print(" ")
+            continue
+
+        
         if len(process_phases[phasenum]) < 2 and phasenum==0:
             print("Error: Phase %s must be manually generated" % (phase_names[phasenum]))
             continue
@@ -162,7 +178,7 @@ while True:
 
         # Create output directory if needed
         if not os.path.exists(output_directory):
-            os.mkdir(oiutput_directory)
+            os.mkdir(output_directory)
             pass
 
         if DELAMO_SCRIPT:
