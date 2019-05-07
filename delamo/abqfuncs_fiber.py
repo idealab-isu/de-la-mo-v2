@@ -49,28 +49,35 @@ class AutoFiber_abq(object):
             rangey = np.array([self.boxcoords[:, 1], self.boxcoords[:, 4]]).T
             rangez = np.array([self.boxcoords[:, 2], self.boxcoords[:, 5]]).T
 
-            for i in range(0, self.meshcoords.shape[0]):
-                element = None
-
-                point = self.meshcoords[i]
-                distances = np.sqrt(np.einsum('ij,ij->i', self.vertices - point, self.vertices - point))
-                idx = np.where(distances == np.min(distances))
-                vert = self.vertices[idx][0]
-
+            def in_box(p):
                 containers = np.where(np.logical_and(np.logical_and(
-                    np.logical_and(vert[0] > rangex[:, 0], vert[0] < rangex[:, 1]),
-                    np.logical_and(vert[1] > rangey[:, 0], vert[1] < rangey[:, 1])),
-                    np.logical_and(vert[2] > rangez[:, 0], vert[2] < rangez[:, 1])))[0]
+                    np.logical_and(p[0] > rangex[:, 0], p[0] < rangex[:, 1]),
+                    np.logical_and(p[1] > rangey[:, 0], p[1] < rangey[:, 1])),
+                    np.logical_and(p[2] > rangez[:, 0], p[2] < rangez[:, 1])))[0]
+                bindx = self.boxes[containers][:, -1][self.boxes[containers][:, -1] != -1][0]
 
-                box_idx = self.boxes[containers][:, -1][self.boxes[containers][:, -1] != -1][0]
-
-                polys = np.array([self.boxpolys[box_idx]])
+                polyslist = np.array([self.boxpolys[bindx]])
                 count = 1
                 while True:
-                    if self.boxpolys[box_idx+count] == -1:
+                    if self.boxpolys[bindx + count] == -1:
                         break
-                    polys = np.append(polys, self.boxpolys[box_idx+count])
+                    polyslist = np.append(polyslist, self.boxpolys[bindx + count])
                     count += 1
+
+                return bindx, polyslist
+
+            for i in range(0, self.meshcoords.shape[0]):
+                idx, element = None, None
+
+                point = self.meshcoords[i]
+
+                try:
+                    box_idx, polys = in_box(point)
+                except IndexError:
+                    distances = np.sqrt(np.einsum('ij,ij->i', self.vertices - point, self.vertices - point))
+                    idx = np.where(distances == np.min(distances))
+                    vert = self.vertices[idx][0]
+                    box_idx, polys = in_box(vert)
 
                 for j in polys:
                     check, projpnt = self.check_proj_inplane_pnt(point, self.vertices[self.vertexids[j]])
@@ -79,6 +86,9 @@ class AutoFiber_abq(object):
                         break
 
                 if element is None:
+                    if idx is None:
+                        distances = np.sqrt(np.einsum('ij,ij->i', self.vertices - point, self.vertices - point))
+                        idx = np.where(distances == np.min(distances))
                     vertneighbors = np.unique(np.where((self.vertexids == idx))[0])
                     element = vertneighbors[0]
 
@@ -90,7 +100,7 @@ class AutoFiber_abq(object):
                     elements.append(i)
                     directions += self.calcunitvector(u3D).tolist() + np.cross(self.calcunitvector(u3D), self.facetnormals[element]).tolist()
                 else:
-                    print("Failed to find point on surface: %s" % vert)
+                    print("Failed to find point on surface: %s" % point)
             orientations = (('', 6, tuple(elements), tuple(directions)),)
             self.orientations = orientations
         else:
