@@ -173,6 +173,7 @@ def CreateDelaminationWire(delam_outline, tolerance):
                 delam_outline))
 
     # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
+    # We need to ignore the last point if we want to make a periodic spline
     delam_outpointsHArray = TColgp_HArray1OfPnt(1, len(delam_outlist)-1)
 
     for pos in range(len(delam_outlist)-1):
@@ -326,8 +327,8 @@ class OCCModelBuilder(object):
         return ProjectionEdges
     
     def OffsetFaceInBothDirections(self,face):
-        #OffsetDist = 100000.0*self.PointTolerance
-        OffsetDist = 1.0
+        OffsetDist = 100000.0*self.PointTolerance
+        #OffsetDist = 1.0  # For debug
         # (do we need to convert face into a shell?) 
         mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, OffsetDist, self.PointTolerance,
                                                                 BRepOffset.BRepOffset_Skin,
@@ -563,10 +564,10 @@ class OCCModelBuilder(object):
 
             # Offset the tool shape to create the inner tool shape for the no model zone
 
-            NoModelDist = -1
+            NoModelDist = -0.5
             mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, NoModelDist, self.PointTolerance,
                                                                    BRepOffset.BRepOffset_Skin,
-                                                                   False, False,
+                                                                   True, True,
                                                                    GeomAbs_Arc)
             
             assert (mkOffset.IsDone())
@@ -574,8 +575,8 @@ class OCCModelBuilder(object):
             #
             step_writer2=STEPControl_Writer()
             step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            #step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Write("/tmp/OffsetTest.STEP")
+            step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            step_writer2.Write("../data/OffsetTest.STEP")
             
             sys.modules["__main__"].__dict__.update(globals())
             sys.modules["__main__"].__dict__.update(locals())
