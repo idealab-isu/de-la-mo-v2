@@ -304,7 +304,7 @@ class DelamoModeler(object):
         # which codestore was used to do the wrapping
         InitDict=initinstrs.wrap_class(dict)   # Dict that will operate during the initialization step
 
-        autofiber=fiberinstrs.wrap_class(AutoFiber_abq)
+        autofiber=fiberinstrs.preexisting_variable("AutoFiber_abq")
 
         FEModel=assemblyinstrs.preexisting_variable("FEModel")
         LaminateAssembly=assemblyinstrs.preexisting_variable("LaminateAssembly")
@@ -1819,8 +1819,4 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         
         pass
 
-    pass
-
-
-class AutoFiber_abq(object):
     pass
