@@ -48,6 +48,8 @@ from OCC.Geom import Geom_Line
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
 from OCC.TopTools import TopTools_ListOfShape
 from OCC.GeomLProp import GeomLProp_SLProps
+from OCC.GProp import GProp_GProps
+from OCC.BRepGProp import brepgprop_SurfaceProperties
 from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
 from OCC.gp import gp_Dir
@@ -286,6 +288,7 @@ class OCCModelBuilder(object):
         self.NormalTolerance=1e-6
         self.Debug=False
         self.NextUnique=0
+        self.GapWidth=0.5 # default gap of 1/2 mm
         
         for argname in kwargs:
             if not hasattr(self,argname):
@@ -523,7 +526,9 @@ class OCCModelBuilder(object):
             # Project the curve on to the face to figure out the parametric curve
             ProjectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
 
-            # Use the parametric curve to create a reference face to determine
+            # Use the parametric curve to create a reference face that is inside the curve, i.e.
+            # inside the delaminated zone, so that we can compare it with the faces that will be generated
+            # by the splitting tool 
             RefParamFace = CreateReferenceFace(ProjectionEdges, layerbodyface.Face, self.PointTolerance)
 
             # Generate faces connecting original and projected edges.
@@ -563,17 +568,37 @@ class OCCModelBuilder(object):
 
             # Offset the tool shape to create the inner tool shape for the no model zone
 
-            NoModelDist = -0.5
-            mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, NoModelDist, self.PointTolerance,
+            # Try offsetting both ways and see which gives the smaller surface area 
+            mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, -self.GapWidth, self.PointTolerance,
+                                                                   BRepOffset.BRepOffset_Skin,
+                                                                   True, True,
+                                                                   GeomAbs_Arc)
+            assert (mkOffset1.IsDone())
+            
+            mkOffset2 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, self.GapWidth, self.PointTolerance,
                                                                    BRepOffset.BRepOffset_Skin,
                                                                    True, True,
                                                                    GeomAbs_Arc)
             
-            assert (mkOffset.IsDone())
-            NoModelToolShape = mkOffset.Shape()
+            assert (mkOffset2.IsDone())
 
-            # Create a Tuple to store the ToolShape and the NoModelToolShape
-            ToolShapes.append((ToolShape, NoModelToolShape))
+            GProps1=GProp_GProps()
+            brepgprop_SurfaceProperties(mkOffset1.Shape(),GProps1)
+            SurfArea1=GProps1.Mass()
+
+            GProps2=GProp_GProps()
+            brepgprop_SurfaceProperties(mkOffset2.Shape(),GProps2)
+            SurfArea2=GProps2.Mass()
+
+            if SurfArea1 > SurfArea2:
+                NoModelToolShape = mkOffset2.Shape()
+                pass
+            else:
+                NoModelToolShape = mkOffset1.Shape()
+                pass
+            
+            # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
+            ToolShapes.append((ToolShape, NoModelToolShape,RefParamFace))
 
             # step_writer2=STEPControl_Writer()
             # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
@@ -620,10 +645,28 @@ class OCCModelBuilder(object):
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
 
+            BCType="TIE" # default 
+            
             #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
 
             split_face = topods_Face(split_face_shape)
             (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
+
+            # Match the split face with all of the ToolShapes, and see if the split_face is part of
+            # any of the tools. If it is, then it is inside a delaminated region and needs to
+            # be split into its CONTACT and NONE zones, and those pieces must be identified and
+            # assigned BCTypes of CONTACT or NONE
+
+            for (ToolShape, NoModelToolShape,RefParamFace) in ToolShapes:
+                # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
+                # mapped to the (x,y) plane. 
+                if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
+                    # Matched! ... This particular split_face is a delamination zone.
+                    # Need to do another split... but for now let's just call it
+                    BCType="CONTACT"
+                    pass
+                
+                pass
 
             #print("Delam: Face of %s: Got point %s" % (layerbodyface.Owner.Name,str(Point)))
 
@@ -633,7 +676,7 @@ class OCCModelBuilder(object):
                                                       ParPoint=ParPoint,
                                                       Direction=layerbodyface.Direction,
                                                       Owner=layerbodyface.Owner,
-                                                      BCType="TIE")) # !!!*** BCType needs to be set correctly ***!!!
+                                                      BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
             
             numsplitfaces = numsplitfaces +1
 
