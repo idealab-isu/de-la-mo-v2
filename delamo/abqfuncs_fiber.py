@@ -97,8 +97,8 @@ class AutoFiber_abq(object):
                     texutexbasis = np.array([1.0, 0.0])
                     texu2dbasis = np.dot(red_texcoords2inplane, texutexbasis)
                     u3D = np.dot(self.inplanemat[element].T, texu2dbasis)
-                    elements.append(i)
-                    directions += self.calcunitvector(u3D).tolist() + np.cross(self.calcunitvector(u3D), self.facetnormals[element]).tolist()
+                    elements.append(i+1)
+                    directions += self.calcunitvector(u3D).tolist() + np.cross(self.facetnormals[element], self.calcunitvector(u3D)).tolist()
                 else:
                     print("Failed to find point on surface: %s" % point)
             orientations = (('', 6, tuple(elements), tuple(directions)),)
