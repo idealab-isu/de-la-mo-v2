@@ -812,7 +812,41 @@ class OCCModelBuilder(object):
         
         return FAL
 
+    def save_layer_surface_stl(self,stlfilename,layer1,layer2,MeshSize):
+        """ Save an .STL of the boundary between layer1 and layer2...
+        Must be called after finalization of BOTH layer1 and layer2."""
+        self.imprint_layers(layer1,layer2)  # imprint_layers operates on the full layers because the bodies might be
+        # subdivided differently on both sides
 
+        shellbuilder = BRep_Builder();
+        shell=TopoDS_Shell();
+        shellbuilder.MakeShell(shell);
+
+        # Should be able to connect these faces
+        # just with a BRep_Builder because they should
+        # already be topologically joined (otherwise
+        # we may need to sew them together
+        # with BRepBuilderAPI_Sewing())
+
+        for lb1 in layer1.BodyList:
+            for lb2 in layer2.BodyList:
+                #print("lb1 = %s; lb2=%s" % (lb1.Name,lb2.Name))
+                FacePairs=self.eval_face_pairs(lb1,lb2)
+
+                               
+                for postimprint_CommonFace in FacePairs:
+                    # postimprint_CommonFace is the LayerBodyFace from lb1... use it to build a shell 
+                    shellbuilder.Add(shell, postimprint_CommonFace.Face);
+                    pass
+                pass
+            pass
+
+        MeshDMObject = layer.Layer.CreateDMObject(shell,MeshSize)
+        MeshDMObject.SaveSTL(stlfilename)
+        pass
+    
+        
+        
     def save(self,cad_file_name,to_be_saved):
         step_writer=STEPControl_Writer()
         BodyNameList=[]

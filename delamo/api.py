@@ -26,7 +26,7 @@ from delamo.abqscript import write_abq_script
 from delamo.abqscript import _capture_assignments_as_variables
 from delamo.OCCModelBuilder import OCCModelBuilder
 from delamo.layer import Layer as OCCLayer
-
+import delamo
 
 #import delamo.CADwrap
 
@@ -1748,7 +1748,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
             
             output_directory=delamo.process.output_dir(delamo_basename)
             delamo_fname=os.path.join(output_directory,"layerboundary_%s_%5.5d.stl" % (delamo_phase,delamo_sourceline))
-            DM.modelbuilder.save_layer_surface_stl(delamo_fname,layer1.gk_layer,layer2.gk_layer)
+            DM.modelbuilder.save_layer_surface_stl(delamo_fname,layer1.gk_layer,layer2.gk_layer,MeshSize)
             pass
         
         

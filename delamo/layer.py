@@ -930,6 +930,11 @@ class LayerMold(object):
                 
                 if DistCalc.NbSolution() > 0 and ThisDist < ClosestDist:
                     ClosestDist=ThisDist
+
+                    DistSupport = DistCalc.SupportOnShape1(1).ShapeType()
+                    if DistSupport != TopAbs_FACE:
+                        raise ValueError("Nearest point on shell to selected point %s for determining ORIGINAL direction is a vertex or and edge, not an interior point on the face. Select a different OrigDirPoint." % (str(OrigDirPoint)))
+                    
                     (ClosestU,ClosestV)=DistCalc.ParOnFaceS1(1) # Evaluate (u,v) coordinates on this face of closest point
                     
                     # Here is an example of how to extract
