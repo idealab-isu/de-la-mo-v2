@@ -121,13 +121,18 @@ FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
 # Create 2nd layer
 layer2 = Layer.CreateFromMold(DM,layer1.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_2", LaminaSection,-45,coordsys=coordsys)
 #layer2.Split(os.path.join("..","data","SplitLine2.csv"),DM.abqpointtolerance)
-layer2.Split(os.path.join("..","data","nasa-delam12-1.csv"),DM.abqpointtolerance)
+#layer2.Split(os.path.join("..","data","nasa-delam12-1.csv"),DM.abqpointtolerance)
+
 layer2.Finalize(DM)
 layer2.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
 # Bond layers 1 and 2. With no other parameters, the layers are attached
 # with a TIE boundary condition
-bond_layers(DM,layer1, layer2)
+#bond_layers(DM,layer1, layer2)
+bond_layers(DM,layer1, layer2, defaultBC="COHESIVE",
+            CohesiveInteraction=CohesiveInteraction,
+            ContactInteraction=ContactInteraction,
+            delaminationlist= [ "../data/nasa-delam12-2.csv" ])
 
 
 # Create 3rd layer
@@ -138,10 +143,6 @@ bond_layers(DM,layer1, layer2)
 
 #bond_layers(DM,layer2, layer3)
 
-#bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
-#            CohesiveInteraction=CohesiveInteraction,
-#            ContactInteraction=ContactInteraction,
-#            delaminationlist= [ "../data/nasa-delam12-1.csv" ])
 
 
 # Finalization generates the output script and CAD model. 
