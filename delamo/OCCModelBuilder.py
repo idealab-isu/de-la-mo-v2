@@ -645,40 +645,88 @@ class OCCModelBuilder(object):
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
 
-            BCType="TIE" # default 
             
             #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
 
-            split_face = topods_Face(split_face_shape)
-            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
+            split_faces = [ topods_Face(split_face_shape) ]
+            BCTypes= [ "TIE" ] # default
+            
+            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_faces[0],self.PointTolerance,self.NormalTolerance)
 
             # Match the split face with all of the ToolShapes, and see if the split_face is part of
             # any of the tools. If it is, then it is inside a delaminated region and needs to
-            # be split into its CONTACT and NONE zones, and those pieces must be identified and
-            # assigned BCTypes of CONTACT or NONE
+            # be split into its CONTACT and NOMODEL zones, and those pieces must be identified and
+            # assigned BCTypes of CONTACT or NOMODEL
 
-            for (ToolShape, NoModelToolShape,RefParamFace) in ToolShapes:
+            for (ToolShape, NoModelToolShape,RefParamFace,NoModelRefParamFace) in ToolShapes:
                 # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
                 # mapped to the (x,y) plane. 
                 if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
                     # Matched! ... This particular split_face is a delamination zone.
                     # Need to do another split... but for now let's just call it
-                    BCType="CONTACT"
-                    pass
+                    #BCTypes[0]="CONTACT"
+
+                    
+                    # Use NoModelToolShape to do the split, operate on split_faces[0]
+                    NoModelSplitter=GEOMAlgo_Splitter()
+                    NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
+                    NoModelSplitter.AddTool(NoModelToolShape)
+                    NoModelSplitter.Perform()
+
+                    # Empty out split_faces and BCTypes list... we will refill them from the pieces
+                    split_faces = []
+                    BCTypes=[]
+                    
+                    NoModelSplitCompound = NoModelSplitter.Shape()
+                    NoModel_split_exp=TopExp_Explorer(NoModelSplitCompound,TopAbs_FACE)
+                    # Iterate over all faces
+                    numnomodelsplitfaces = 0
+
+                    # Iterate over the pieces that have been split. ... Some of these will
+                    # be for CONTACT b.c.'s, and some NOMODEL.
+                    #
+
+                    # We tell the difference by using a previously create reference face in parametric coordinates
+                    # that includes solely the CONTACT zone. We deterimine a parametric coordinates point for
+                    # each of these faces, and check it against the previously determine reference face
+                    while NoModel_split_exp.More():
+                        nomodel_split_face_shape=NoModel_split_exp.Current()
+
+                        (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
+                        
+                        split_faces.append(nomodel_split_face_shape)
+
+
+                        if (layer.OCCPointInFace((NoModel_Split_ParPoint[0],NoModel_Split_ParPoint[1],0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
+                            # Matched! ... This particular nomodel_split_face is a contact zone.
+                            #BCTypes[0]="CONTACT"
+                            BCTypes.append("CONTACT")
+                            pass
+                        else:
+                            BCTypes.append("NOMODEL")
+                            pass
+                        
+                        pass
+                    break
                 
                 pass
 
             #print("Delam: Face of %s: Got point %s" % (layerbodyface.Owner.Name,str(Point)))
 
-            split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
-                                                      Point=Point,
-                                                      Normal=Normal,
-                                                      ParPoint=ParPoint,
-                                                      Direction=layerbodyface.Direction,
-                                                      Owner=layerbodyface.Owner,
-                                                      BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
             
-            numsplitfaces = numsplitfaces +1
+            for facecnt in range(len(split_faces)):
+                split_face=split_faces[facecnt]
+                BCType=BCTypes[facecnt]
+                split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
+                                                          Point=Point,
+                                                          Normal=Normal,
+                                                          ParPoint=ParPoint,
+                                                          Direction=layerbodyface.Direction,
+                                                          Owner=layerbodyface.Owner,
+                                                          BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
+                numsplitfaces = numsplitfaces +1
+                pass
+            
 
             split_face_exp.Next()
             pass
