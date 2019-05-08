@@ -58,6 +58,7 @@ from OCC import GeomProjLib
 from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
 from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
+from OCC.ShapeFix import ShapeFix_Edge
 
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
@@ -442,7 +443,13 @@ class OCCModelBuilder(object):
             for edgecnt in range(len(edge_edges)):
                 projectionEdge = ProjectionEdges[edgecnt]
                 curveParPts = []
+
+                # Make sure this edge has a pcurve (2d projected curve) on this face
+                edgefixer=ShapeFix_Edge()
+                edgefixer.FixAddPCurve(projectionEdge,layerbodyface.Face,False)
+                
                 (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(projectionEdge, layerbodyface.Face)
+                
                 curve = curveHandle.GetObject()
                 print(parStart, parEnd)
                 for u in [x * (1.0/100.0) for x in range(0, 100)]:
@@ -451,8 +458,8 @@ class OCCModelBuilder(object):
 
 
             step_writer2=STEPControl_Writer()
-            step_writer2.Transfer(ProjectionEdge,STEPControl_GeometricCurveSet,True)
-            step_writer2.Write("../data/allShapes.STEP")
+            step_writer2.Transfer(projectionEdge,STEPControl_GeometricCurveSet,True)
+            step_writer2.Write("../data/projectionEdge.STEP")
 
             # Generate faces connecting original and projected edges.
             # We will use this as a tool to do the cut. 
