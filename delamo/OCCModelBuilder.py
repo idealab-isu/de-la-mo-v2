@@ -560,7 +560,6 @@ class OCCModelBuilder(object):
             ToolShape = ToolGenerator.Shape()
 
             build.Add(Perimeter,ToolShape)
-            ToolShapes.append(ToolShape)
 
             # Offset the tool shape to create the inner tool shape for the no model zone
 
@@ -572,23 +571,26 @@ class OCCModelBuilder(object):
             
             assert (mkOffset.IsDone())
             NoModelToolShape = mkOffset.Shape()
+
+            # Create a Tuple to store the ToolShape and the NoModelToolShape
+            ToolShapes.append((ToolShape, NoModelToolShape))
+
+            # step_writer2=STEPControl_Writer()
+            # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Write("../data/OffsetTest.STEP")
             #
-            step_writer2=STEPControl_Writer()
-            step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Write("../data/OffsetTest.STEP")
-            
-            sys.modules["__main__"].__dict__.update(globals())
-            sys.modules["__main__"].__dict__.update(locals())
-            raise ValueError("Break")
+            # sys.modules["__main__"].__dict__.update(globals())
+            # sys.modules["__main__"].__dict__.update(locals())
+            # raise ValueError("Break")
 
             pass
         
-            
+        # Split the face using the delamination zones
         GASplitter=GEOMAlgo_Splitter()
         GASplitter.AddArgument(topods_Face(layerbodyface.Face))
         for ToolShape in ToolShapes:
-            GASplitter.AddTool(ToolShape)
+            GASplitter.AddTool(ToolShape[0])
             pass
         
         GASplitter.Perform()
