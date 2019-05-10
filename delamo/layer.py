@@ -519,6 +519,8 @@ class Layer(object):
     # PairOrig: Layer object on this layer's orig side
 
     RefMold = None # LayerMold that had been used for offset operation
+
+    DMObj = None
     
     def __init__(self,**kwargs):
         self.BodyList=[]
@@ -586,7 +588,7 @@ class Layer(object):
 
 
     @classmethod
-    def CreateFromMold(cls,Name,Mold,Thickness,Direction,Tolerance):
+    def CreateFromMold(cls,Name,Mold,Thickness,Direction,Tolerance,MeshSize=0.5):
         """Create a layer from a LayerMold."""
 
         if Direction=="OFFSET":
@@ -723,13 +725,15 @@ class Layer(object):
             raise ValueError("Solid maker did not yield a closed solid")
         # We successfully got a closed solid
 
+        DMObj = cls.CreateDMObject(Mold.Shape, MeshSize)
         
         #return [layerSolid, offsetSurface]
         NewLayer= cls(Name=Name,
                       Type="LAMINA",
                       Direction=Direction,
                       Thickness=Thickness,
-                      RefMold=Mold)
+                      RefMold=Mold,
+                      DMObj=DMObj)
 
 
         NewLayerBody = LayerBody(Name="%s_LB1" % (Name),

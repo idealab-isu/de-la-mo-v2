@@ -1091,6 +1091,7 @@ class Layer(Assembly):
     def __init__(self,**kwargs):
         self.parts=None
         self.assemblies=collections.OrderedDict()
+        self.orientation=None
         for key in kwargs:
             assert(hasattr(self,key))
             setattr(self,key,kwargs[key])
@@ -1110,7 +1111,7 @@ class Layer(Assembly):
         return region
     
     @classmethod
-    def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, split=None, coordsys=None):
+    def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, meshsize=0.5, split=None, coordsys=None):
         """Create a layer given creation parameters to be passed to the geometry kernel, a name, ABAQUS Section, 
 layup direction, etc."""
         # create_params should be a tuple with all parameters to create_layer, except for the gk_layer object at the end
@@ -1133,34 +1134,41 @@ layup direction, etc."""
         # until "Finalize" method when the part list is extracted from
         # the geometry kernel
 
+        # Is this an appropriate place for this?
+        # gk_layer.DMObj = gk_layer.CreateDMObject(gk_layer.RefMold.Shape, meshsize)
+
         return cls(name=name,gk_layer=gk_layer,layupdirection=layupdirection,LayerSection=LayerSection,coordsys=coordsys)
 
-    def CreateFiberObject(self, DM, point, fibervec, normal, mp, fiberint=1.0, meshsize=0.5, final_plotting=False):
-        DMObj = self.gk_layer.CreateDMObject(self.gk_layer.OrigMold().Shape, meshsize)
+    def CreateFiberObject(self, DM, point, fibervec, normal, mp, fiberint=1.0, final_plotting=False):
+        self.orientation = AutoFiber(self.gk_layer.DMObj,
+                                     point, fibervec, normal,
+                                     E=[mp[0], mp[1], mp[3]],
+                                     nu=[mp[3], mp[4], mp[5]],
+                                     G=[mp[6], mp[7], mp[8]],
+                                     fiberint=fiberint)
 
-        orientation = AutoFiber(DMObj,
-                                point, fibervec, normal,
-                                E=[mp[0], mp[1], mp[3]],
-                                nu=[mp[3], mp[4], mp[5]],
-                                G=[mp[6], mp[7], mp[8]],
-                                fiberint=fiberint)
+        self.LayupFiberObject(DM, self.layupdirection, final_plotting=final_plotting)
 
-        texcoord2inplane = orientation.layup(self.layupdirection, plotting=final_plotting)
+    def LayupFiberObject(self, DM, layupdirection, final_plotting=False):
+        if self.orientation is not None:
+            texcoord2inplane = self.orientation.layup(layupdirection, plotting=final_plotting)
 
-        layerfiber = DM.fiberinstrs.assign_variable("%s_fiber" % self.name, (texcoord2inplane,
-                                                                             orientation.vertices,
-                                                                             orientation.vertexids,
-                                                                             orientation.inplanemat,
-                                                                             orientation.boxes,
-                                                                             orientation.boxpolys,
-                                                                             orientation.boxcoords,
-                                                                             orientation.facetnormals))
-        for body in self.gk_layer.BodyList:
-            body.fiberorientation = DM.autofiber.CreateFromParams(body.Name, DM.FEModel, layerfiber)
-            body.fiberorientation.getMeshCenters()
-            body.fiberorientation.getFiberOrientations()
-            body.fiberorientation.CreateDiscreteField()
-
+            layerfiber = DM.fiberinstrs.assign_variable(("%s_%s_fiber" % (self.name, layupdirection)).replace("-", "n"),
+                                                        (texcoord2inplane,
+                                                         self.orientation.vertices,
+                                                         self.orientation.vertexids,
+                                                         self.orientation.inplanemat,
+                                                         self.orientation.boxes,
+                                                         self.orientation.boxpolys,
+                                                         self.orientation.boxcoords,
+                                                         self.orientation.facetnormals))
+            for body in self.gk_layer.BodyList:
+                body.fiberorientation = DM.autofiber.CreateFromParams(body.Name, DM.FEModel, layerfiber)
+                body.fiberorientation.getMeshCenters()
+                body.fiberorientation.getFiberOrientations()
+                body.fiberorientation.CreateDiscreteField()
+        else:
+            raise ValueError("Fiber orientation is None. Must run CreateFiberObject on this layer first.")
 
     def Finalize(self,DM):
         """Build Python and Finite Element structure for this layer based on geometry kernel structure.
@@ -1194,7 +1202,7 @@ layup direction, etc."""
 
 
     @classmethod
-    def CreateFromMold(cls,DM,mold,direction,thickness,name,Section,layup,coordsys=None):
+    def CreateFromMold(cls,DM,mold,direction,thickness,name,Section,layup,meshsize=0.5,coordsys=None):
         """Create a layer atop the specified mold. 
  * direction: "OFFSET" or "ORIG"
  * thickness: Thickness of layer (offsetting operation)
@@ -1203,7 +1211,7 @@ layup direction, etc."""
  * layup: Ply orientation in degrees
  * coordsys: Reference coordinate system for layup"""
 
-        gk_layer=OCCLayer.CreateFromMold(name,mold,thickness,direction,DM.modelbuilder.PointTolerance)
+        gk_layer=OCCLayer.CreateFromMold(name,mold,thickness,direction,DM.modelbuilder.PointTolerance,MeshSize=meshsize)
         
         return cls(name=name,gk_layer=gk_layer,layupdirection=layup,LayerSection=Section,coordsys=coordsys)
 
