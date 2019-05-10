@@ -26,6 +26,7 @@ from OCC import BRepBuilderAPI
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+#from OCC.BRepBuilderAPI import BRepBuilderAPI_FaceError
 #from OCC.BRepClass import BRepClass_FacePassiveClassifier
 from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
@@ -47,10 +48,13 @@ from OCC.Geom import Geom_Line
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
 from OCC.TopTools import TopTools_ListOfShape
 from OCC.GeomLProp import GeomLProp_SLProps
+from OCC.GProp import GProp_GProps
+from OCC.BRepGProp import brepgprop_SurfaceProperties
 from OCC.gp import gp_Pnt2d
 from OCC.gp import gp_Vec
 from OCC.gp import gp_Dir
 from OCC.gp import gp_Pnt
+from OCC.gp import gp_Pln
 from OCC.GEOMAlgo import GEOMAlgo_Splitter
 from OCC.Geom2d import Geom2d_Curve
 from OCC.BRepAlgoAPI import BRepAlgoAPI_Fuse
@@ -58,6 +62,7 @@ from OCC import GeomProjLib
 from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
 from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
+from OCC.ShapeFix import ShapeFix_Edge
 
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
@@ -69,6 +74,153 @@ from .layer import OCCPointInFace
 
 from . import loaders
 from . import layer
+
+
+def FaceFaceIntersect(face1, face2):
+
+
+
+
+
+
+
+    step_writer2 = STEPControl_Writer()
+    step_writer2.Transfer(face1,STEPControl_ShellBasedSurfaceModel,True)
+    step_writer2.Transfer(face2, STEPControl_ShellBasedSurfaceModel, True)
+    step_writer2.Write("../data/allShapes.STEP")
+
+    sys.modules["__main__"].__dict__.update(globals())
+    sys.modules["__main__"].__dict__.update(locals())
+    raise ValueError("Break")
+
+
+
+    return wireShape
+
+
+def CreateReferenceFace(edges, face, tolerance):
+    # Evaluate points on projected curve and evaluate the parametric points
+    numPoints = 100
+    for edgecnt in range(len(edges)):
+        projectionEdge = edges[edgecnt]
+        curveParPts = []
+
+        # Make sure this edge has a pcurve (2d projected curve) on this face
+        edgefixer = ShapeFix_Edge()
+        edgefixer.FixAddPCurve(projectionEdge, face, False)
+
+        (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(projectionEdge, face)
+        #print(parStart, parEnd)
+
+        curve = curveHandle.GetObject()
+        for u in [x * (1.0 / numPoints)*(parEnd - parStart) + parStart for x in range(0, numPoints)]:
+            curvePoint = curve.Value(u)
+            u = curvePoint.X()
+            v = curvePoint.Y()
+            curveParPts.append((u, v, 0))
+            pass
+
+    curveParPts.append(curveParPts[0])
+
+
+    # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
+    parPointsHArray = TColgp_HArray1OfPnt(1, len(curveParPts))
+
+    for pos in range(len(curveParPts)):
+        current_point = gp_Pnt(curveParPts[pos][0], curveParPts[pos][1], curveParPts[pos][2])
+        parPointsHArray.SetValue(pos + 1, current_point)
+        pass
+
+    # Interpolate the points to make a closed curve
+    interpAPI = GeomAPI_Interpolate(parPointsHArray.GetHandle(), False, tolerance)
+    interpAPI.Perform()
+    if interpAPI.IsDone():
+        delam_par_curve = interpAPI.Curve()
+    else:
+        raise ValueError("Parametric curve interpolation failed\n")
+
+    # Convert a curve to edge and then to Shape
+    delam_par_edge = BRepBuilderAPI_MakeEdge(delam_par_curve).Edge()
+    WireBuilder = BRepBuilderAPI_MakeWire()
+    WireBuilder.Add(delam_par_edge)
+    ParWireShape = WireBuilder.Shape()
+    assert (ParWireShape.Closed())
+
+    P = gp_Pln()
+    FaceBuilder = BRepBuilderAPI_MakeFace(P, topods_Wire(ParWireShape), True)
+    referenceFace = FaceBuilder.Face()
+
+    #error = FaceBuilder.Error()
+    #if (error != BRepBuilderAPI_FaceError.BRepBuilderAPI_FaceDone):
+    #    print("Reference face generation failed!")
+    #    pass
+
+    # step_writer2 = STEPControl_Writer()
+    # step_writer2.Transfer(referenceFace,STEPControl_ShellBasedSurfaceModel,True)
+    # step_writer2.Transfer(ParWireShape, STEPControl_GeometricCurveSet, True)
+    # step_writer2.Write("../data/allShapes.STEP")
+    #
+    # sys.modules["__main__"].__dict__.update(globals())
+    # sys.modules["__main__"].__dict__.update(locals())
+    # raise ValueError("Break")
+
+    return referenceFace
+
+
+
+def CreateDelaminationWire(delam_outline, tolerance):
+    # Create a delamination wire from the delam_outline file
+
+    delam_outlist = []
+    with open(delam_outline) as csvfile:
+        reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+        for row in reader:
+            if len(row) != 3:
+                raise ValueError("Malformed row in CSV file %s: %s" % (delam_outline, ",".join(row)))
+            try:
+                x = float(row[0])
+                y = float(row[1])
+                z = float(row[2])
+                delam_outlist.append((x, y, z))
+                pass
+            except ValueError:
+                pass
+            pass
+        pass
+
+    if len(delam_outlist) == 0:
+        raise ValueError("Could not parse any lines from CSV file %s" % (delam_outline))
+
+    if delam_outlist[0] != delam_outlist[-1]:
+        raise ValueError(
+            "Delamination outline from %s does not form a closed wire (first and last vertices do not match)" % (
+                delam_outline))
+
+    # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
+    # We need to ignore the last point if we want to make a periodic spline
+    delam_outpointsHArray = TColgp_HArray1OfPnt(1, len(delam_outlist)-1)
+
+    for pos in range(len(delam_outlist)-1):
+        current_point = gp_Pnt(delam_outlist[pos][0], delam_outlist[pos][1], delam_outlist[pos][2])
+        delam_outpointsHArray.SetValue(pos + 1, current_point)
+        pass
+
+    # Interpolate the points to make a closed curve
+    interpAPI = GeomAPI_Interpolate(delam_outpointsHArray.GetHandle(), True, tolerance)
+    interpAPI.Perform()
+    if interpAPI.IsDone():
+        delam_out_curve = interpAPI.Curve()
+    else:
+        raise ValueError("Curve interpolation failed\n")
+
+    # Convert a curve to edge and then to Shape
+    delam_out_edge = BRepBuilderAPI_MakeEdge(delam_out_curve).Edge()
+    WireBuilder = BRepBuilderAPI_MakeWire()
+    WireBuilder.Add(delam_out_edge)
+    WireShape = WireBuilder.Shape()
+    assert (WireShape.Closed())
+
+    return WireShape
 
 
 def ReplaceFacesWithImprintedSubfacesInLayerBodyFaceList(ImprintedFaces,LayerBodyFaceList,PointTolerance):
@@ -158,6 +310,7 @@ class OCCModelBuilder(object):
         self.NormalTolerance=1e-6
         self.Debug=False
         self.NextUnique=0
+        self.GapWidth=0.5 # default gap of 1/2 mm
         
         for argname in kwargs:
             if not hasattr(self,argname):
@@ -200,6 +353,7 @@ class OCCModelBuilder(object):
     
     def OffsetFaceInBothDirections(self,face):
         OffsetDist = 100000.0*self.PointTolerance
+        #OffsetDist = 1.0  # For debug
         # (do we need to convert face into a shell?) 
         mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(face, OffsetDist, self.PointTolerance,
                                                                 BRepOffset.BRepOffset_Skin,
@@ -346,55 +500,13 @@ class OCCModelBuilder(object):
         ToolShapes=[]
         
         for delam_outline in delam_outlines:
-            # ***!!! Temporarily load curve rather than constructing wire from delamination outline
-
             # ***!!! Still need to implement in-plane offsets
+
+            # Loading WireShape directly from a STEP file
+            #WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
+
             # delam_outline is the file name
-            delam_outlist = []
-            with open(delam_outline) as csvfile:
-                reader=csv.reader(csvfile,delimiter=',',quotechar='"')
-                for row in reader:
-                    if len(row) != 3:
-                        raise ValueError("Malformed row in CSV file %s: %s" % (delam_outline,",".join(row)))
-                    try:
-                        x=float(row[0])
-                        y=float(row[1])
-                        z=float(row[2])
-                        delam_outlist.append((x,y,z))
-                        pass
-                    except ValueError:
-                        pass
-                    pass
-                pass
-
-            if len(delam_outlist) == 0:
-                raise ValueError("Could not parse any lines from CSV file %s" % (delam_outline))
-
-            if delam_outlist[0] != delam_outlist[-1]:
-                raise ValueError("Delamination outline from %s does not form a closed wire (first and last vertices do not match)" % (delam_outline))
-            
-            # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
-            delam_outpointsHArray = TColgp_HArray1OfPnt(1, len(delam_outlist))
-
-            for pos in range(len(delam_outlist)):
-                current_point = gp_Pnt(delam_outlist[pos][0],delam_outlist[pos][1],delam_outlist[pos][2])
-                delam_outpointsHArray.SetValue(pos+1, current_point)
-                pass
-
-            # Interpolate the points to make a closed curve
-            interpAPI = GeomAPI_Interpolate(delam_outpointsHArray.GetHandle(), False, self.PointTolerance)
-            interpAPI.Perform()
-            if interpAPI.IsDone():
-                 delam_out_curve = interpAPI.Curve()
-            else:
-                raise ValueError("Curve interpolation failed\n")
-
-            # Convert a curve to edge and then to Shape
-            delam_out_edge = BRepBuilderAPI_MakeEdge(delam_out_curve).Edge()
-            WireBuilder = BRepBuilderAPI_MakeWire()
-            WireBuilder.Add(delam_out_edge)
-            WireShape = WireBuilder.Shape()
-            assert(WireShape.Closed())
+            WireShape = CreateDelaminationWire(delam_outline, self.PointTolerance)
 
             # Offset wire to create no model shape
 
@@ -415,8 +527,6 @@ class OCCModelBuilder(object):
             #sys.modules["__main__"].__dict__.update(locals())
             #raise ValueError("Break")
 
-            # Loading WireShape directly from a STEP file
-            #WireShape = loaders.load_byfilename(os.path.join("..","data","Delam1.STEP"))
 
             exp=TopExp_Explorer(WireShape,TopAbs_EDGE)
             
@@ -438,28 +548,16 @@ class OCCModelBuilder(object):
             # Project the curve on to the face to figure out the parametric curve
             ProjectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
 
-            # Evaluate points on projected curve and evaluate the parametric points
-            for edgecnt in range(len(edge_edges)):
-                projectionEdge = ProjectionEdges[edgecnt]
-                curveParPts = []
-                (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(projectionEdge, layerbodyface.Face)
-                curve = curveHandle.GetObject()
-                print(parStart, parEnd)
-                for u in [x * (1.0/100.0) for x in range(0, 100)]:
-                    curvePoint = curve.Value(u)
-                    curveParPts.append(curvePoint)
-
-
-            step_writer2=STEPControl_Writer()
-            step_writer2.Transfer(ProjectionEdge,STEPControl_GeometricCurveSet,True)
-            step_writer2.Write("../data/allShapes.STEP")
+            # Use the parametric curve to create a reference face that is inside the curve, i.e.
+            # inside the delaminated zone, so that we can compare it with the faces that will be generated
+            # by the splitting tool 
+            RefParamFace = CreateReferenceFace(ProjectionEdges, layerbodyface.Face, self.PointTolerance)
 
             # Generate faces connecting original and projected edges.
             # We will use this as a tool to do the cut. 
-            
             # For the moment assume only one edge
         
-            build=BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+            build=BRep_Builder()
             Perimeter=TopoDS_Compound()
             build.MakeCompound(Perimeter)
             
@@ -489,35 +587,60 @@ class OCCModelBuilder(object):
             ToolShape = ToolGenerator.Shape()
 
             build.Add(Perimeter,ToolShape)
-            ToolShapes.append(ToolShape)
 
             # Offset the tool shape to create the inner tool shape for the no model zone
 
-            NoModelDist = 1
-            mkOffset = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, NoModelDist, self.PointTolerance,
+            # Try offsetting both ways and see which gives the smaller surface area 
+            mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, -self.GapWidth, self.PointTolerance,
                                                                    BRepOffset.BRepOffset_Skin,
-                                                                   False, False,
+                                                                   True, True,
                                                                    GeomAbs_Arc)
+            assert (mkOffset1.IsDone())
+            
+            mkOffset2 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, self.GapWidth, self.PointTolerance,
+                                                                   BRepOffset.BRepOffset_Skin,
+                                                                   True, True,
+                                                                   GeomAbs_Arc)
+            
+            assert (mkOffset2.IsDone())
 
-            assert (mkOffset.IsDone())
-            NoModelToolShape = mkOffset.Shape()
+            GProps1=GProp_GProps()
+            brepgprop_SurfaceProperties(mkOffset1.Shape(),GProps1)
+            SurfArea1=GProps1.Mass()
 
-            step_writer2=STEPControl_Writer()
-            step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Write("../data/allShapes.STEP")
+            GProps2=GProp_GProps()
+            brepgprop_SurfaceProperties(mkOffset2.Shape(),GProps2)
+            SurfArea2=GProps2.Mass()
 
-            sys.modules["__main__"].__dict__.update(globals())
-            sys.modules["__main__"].__dict__.update(locals())
-            raise ValueError("Break")
+            if SurfArea1 > SurfArea2:
+                NoModelToolShape = mkOffset2.Shape()
+                pass
+            else:
+                NoModelToolShape = mkOffset1.Shape()
+                pass
+
+            # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
+            NoModelWireShape = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+
+            # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
+            ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace))
+
+            # step_writer2=STEPControl_Writer()
+            # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Write("../data/OffsetTest.STEP")
+            #
+            # sys.modules["__main__"].__dict__.update(globals())
+            # sys.modules["__main__"].__dict__.update(locals())
+            # raise ValueError("Break")
 
             pass
         
-            
+        # Split the face using the delamination zones
         GASplitter=GEOMAlgo_Splitter()
         GASplitter.AddArgument(topods_Face(layerbodyface.Face))
         for ToolShape in ToolShapes:
-            GASplitter.AddTool(ToolShape)
+            GASplitter.AddTool(ToolShape[0])
             pass
         
         GASplitter.Perform()
@@ -540,27 +663,95 @@ class OCCModelBuilder(object):
         numsplitfaces = 0
         split_face_shapes=[]
         split_layerbodyfaces=[]
+
         #step_writer = STEPControl_Writer()
 
         while split_face_exp.More():
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
+
+            
             #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
 
-            split_face = topods_Face(split_face_shape)
-            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
+            split_faces = [ topods_Face(split_face_shape) ]
+            BCTypes= [ "TIE" ] # default
+            
+            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_faces[0],self.PointTolerance,self.NormalTolerance)
+
+            # Match the split face with all of the ToolShapes, and see if the split_face is part of
+            # any of the tools. If it is, then it is inside a delaminated region and needs to
+            # be split into its CONTACT and NOMODEL zones, and those pieces must be identified and
+            # assigned BCTypes of CONTACT or NOMODEL
+
+            for (ToolShape, NoModelToolShape,RefParamFace,NoModelRefParamFace) in ToolShapes:
+                # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
+                # mapped to the (x,y) plane. 
+                if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
+                    # Matched! ... This particular split_face is a delamination zone.
+                    # Need to do another split... but for now let's just call it
+                    #BCTypes[0]="CONTACT"
+
+                    
+                    # Use NoModelToolShape to do the split, operate on split_faces[0]
+                    NoModelSplitter=GEOMAlgo_Splitter()
+                    NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
+                    NoModelSplitter.AddTool(NoModelToolShape)
+                    NoModelSplitter.Perform()
+
+                    # Empty out split_faces and BCTypes list... we will refill them from the pieces
+                    split_faces = []
+                    BCTypes=[]
+                    
+                    NoModelSplitCompound = NoModelSplitter.Shape()
+                    NoModel_split_exp=TopExp_Explorer(NoModelSplitCompound,TopAbs_FACE)
+                    # Iterate over all faces
+                    numnomodelsplitfaces = 0
+
+                    # Iterate over the pieces that have been split. ... Some of these will
+                    # be for CONTACT b.c.'s, and some NOMODEL.
+                    #
+
+                    # We tell the difference by using a previously create reference face in parametric coordinates
+                    # that includes solely the CONTACT zone. We deterimine a parametric coordinates point for
+                    # each of these faces, and check it against the previously determine reference face
+                    while NoModel_split_exp.More():
+                        nomodel_split_face_shape=NoModel_split_exp.Current()
+
+                        (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
+                        
+                        split_faces.append(nomodel_split_face_shape)
+
+
+                        if (layer.OCCPointInFace((NoModel_Split_ParPoint[0],NoModel_Split_ParPoint[1],0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
+                            # Matched! ... This particular nomodel_split_face is a contact zone.
+                            #BCTypes[0]="CONTACT"
+                            BCTypes.append("CONTACT")
+                            pass
+                        else:
+                            BCTypes.append("NOMODEL")
+                            pass
+                        
+                        pass
+                    break
+                
+                pass
 
             #print("Delam: Face of %s: Got point %s" % (layerbodyface.Owner.Name,str(Point)))
 
-            split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
-                                                      Point=Point,
-                                                      Normal=Normal,
-                                                      ParPoint=ParPoint,
-                                                      Direction=layerbodyface.Direction,
-                                                      Owner=layerbodyface.Owner,
-                                                      BCType="TIE")) # !!!*** BCType needs to be set correctly ***!!!
             
-            numsplitfaces = numsplitfaces +1
+            for facecnt in range(len(split_faces)):
+                split_face=split_faces[facecnt]
+                BCType=BCTypes[facecnt]
+                split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
+                                                          Point=Point,
+                                                          Normal=Normal,
+                                                          ParPoint=ParPoint,
+                                                          Direction=layerbodyface.Direction,
+                                                          Owner=layerbodyface.Owner,
+                                                          BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
+                numsplitfaces = numsplitfaces +1
+                pass
+            
 
             split_face_exp.Next()
             pass
@@ -596,40 +787,35 @@ class OCCModelBuilder(object):
 
         # Create a reference face using the ProjectionEdges and layerbodyface.Face
         # Project the outline onto the face to figure out Boundary Conditions
-        projectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
+        #projectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
 
         #Make wire from edges
-        WireBuilder = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
-        WirePerimeter = TopoDS_Compound()
-        WireBuilder.MakeCompound(WirePerimeter)
+        #WireBuilder = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+        #WirePerimeter = TopoDS_Compound()
+        #WireBuilder.MakeCompound(WirePerimeter)
 
-        delamWire = TopoDS_Wire()
-        WireBuilder.MakeWire(delamWire)
+        #delamWire = TopoDS_Wire()
+        #WireBuilder.MakeWire(delamWire)
 
-        for edgecnt in range(len(edge_edges)):
-            projectionEdge = projectionEdges[edgecnt]
-            WireBuilder.Add(delamWire, projectionEdge)
-            pass
+        #for edgecnt in range(len(edge_edges)):
+        #    projectionEdge = projectionEdges[edgecnt]
+        #    WireBuilder.Add(delamWire, projectionEdge)
+        #    pass
 
-        delamSurface = BRep_Tool.Surface(layerbodyface.Face)
-        FaceBuilder = BRepBuilderAPI_MakeFace(delamSurface, self.PointTolerance)
-        delamFace = FaceBuilder.Face()
-        FaceBuilder.Add(delamWire)
+        #delamSurface = BRep_Tool.Surface(layerbodyface.Face)
+        #FaceBuilder = BRepBuilderAPI_MakeFace(delamSurface, self.PointTolerance)
+        #delamFace = FaceBuilder.Face()
+        #FaceBuilder.Add(delamWire)
 
-        error = FaceBuilder.Error()
-        print("Error : %d"%(error))
+        #error = FaceBuilder.Error()
+        #print("Error : %d"%(error))
         #if (error != BRepBuilderAPI_Error.BRepBuilderAPI_FaceDone):
         #    print("Face generation failed!")
 
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(delamFace,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(delamFace,STEPControl_ShellBasedSurfaceModel,True)
         #step_writer2.Transfer(delamWire,STEPControl_GeometricCurveSet,True)
-        step_writer2.Write("../data/allShapes.STEP")
-
-
-        sys.modules["__main__"].__dict__.update(globals())
-        sys.modules["__main__"].__dict__.update(locals())
-        raise ValueError("Break")
+        #step_writer2.Write("../data/allShapes.STEP")
 
         # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
 
