@@ -76,6 +76,28 @@ from . import loaders
 from . import layer
 
 
+def FaceFaceIntersect(face1, face2):
+
+
+
+
+
+
+
+    step_writer2 = STEPControl_Writer()
+    step_writer2.Transfer(face1,STEPControl_ShellBasedSurfaceModel,True)
+    step_writer2.Transfer(face2, STEPControl_ShellBasedSurfaceModel, True)
+    step_writer2.Write("../data/allShapes.STEP")
+
+    sys.modules["__main__"].__dict__.update(globals())
+    sys.modules["__main__"].__dict__.update(locals())
+    raise ValueError("Break")
+
+
+
+    return wireShape
+
+
 def CreateReferenceFace(edges, face, tolerance):
     # Evaluate points on projected curve and evaluate the parametric points
     numPoints = 100
@@ -596,9 +618,12 @@ class OCCModelBuilder(object):
             else:
                 NoModelToolShape = mkOffset1.Shape()
                 pass
-            
+
+            # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
+            NoModelWireShape = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
-            ToolShapes.append((ToolShape, NoModelToolShape,RefParamFace))
+            ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace))
 
             # step_writer2=STEPControl_Writer()
             # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
