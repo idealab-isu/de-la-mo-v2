@@ -58,11 +58,13 @@ from OCC.gp import gp_Pln
 from OCC.GEOMAlgo import GEOMAlgo_Splitter
 from OCC.Geom2d import Geom2d_Curve
 from OCC.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from OCC.BRepAlgoAPI import BRepAlgoAPI_Section
 from OCC import GeomProjLib
 from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
 from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
 from OCC.ShapeFix import ShapeFix_Edge
+from OCC.ShapeAnalysis import ShapeAnalysis_WireOrder
 
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
@@ -78,39 +80,72 @@ from . import layer
 
 def FaceFaceIntersect(face1, face2):
 
+    section = BRepAlgoAPI_Section(face1, face2)
+    section.Build()
+
+    # sectionCompoundEdges is a compound shape
+    # Need to iterate and get all edges
+
+    if section.IsDone():
+        sectionCompoundEdges = section.Shape()
+    else:
+        raise ValueError("Could not compute Section!")
+
+
+    exp = TopExp_Explorer(sectionCompoundEdges, TopAbs_EDGE)
+
+    # Iterate over all edges
+    # return a list of edges
+
+    edge_list = []
+    while exp.More():
+        current_edge = topods_Edge(exp.Current())
+        edge_list.append(current_edge)
+        exp.Next()
+        pass
 
 
 
+    # build = BRep_Builder()
+    # Perimeter = TopoDS_Compound()
+    # build.MakeCompound(Perimeter)
+    # wire = TopoDS_Wire()
+    # build.MakeWire(wire)
+    # while exp.More():
+    #     current_edge = exp.Current()
+    #     build.Add(wire, current_edge)
+    #     exp.Next()
+    #     pass
 
+    # WireBuilder = BRepBuilderAPI_MakeWire()
+    # WireBuilder.Add(wire)
+    # WireShape = WireBuilder.Shape()
+    # assert (WireShape.Closed())
 
+    # step_writer2 = STEPControl_Writer()
+    # step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
+    # step_writer2.Write("../data/allShapes.STEP")
+    #
+    # sys.modules["__main__"].__dict__.update(globals())
+    # sys.modules["__main__"].__dict__.update(locals())
+    # raise ValueError("Break")
 
-    step_writer2 = STEPControl_Writer()
-    step_writer2.Transfer(face1,STEPControl_ShellBasedSurfaceModel,True)
-    step_writer2.Transfer(face2, STEPControl_ShellBasedSurfaceModel, True)
-    step_writer2.Write("../data/allShapes.STEP")
-
-    sys.modules["__main__"].__dict__.update(globals())
-    sys.modules["__main__"].__dict__.update(locals())
-    raise ValueError("Break")
-
-
-
-    return wireShape
+    return edge_list
 
 
 def CreateReferenceFace(edges, face, tolerance):
     # Evaluate points on projected curve and evaluate the parametric points
-    numPoints = 100
+    numPoints = 200
+    curveParPts = []
     for edgecnt in range(len(edges)):
-        projectionEdge = edges[edgecnt]
-        curveParPts = []
+        edge = edges[edgecnt]
 
         # Make sure this edge has a pcurve (2d projected curve) on this face
         edgefixer = ShapeFix_Edge()
-        edgefixer.FixAddPCurve(projectionEdge, face, False)
+        edgefixer.FixAddPCurve(edge, face, False)
 
-        (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(projectionEdge, face)
-        #print(parStart, parEnd)
+        (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(edge, face)
+        # print(parStart, parEnd)
 
         curve = curveHandle.GetObject()
         for u in [x * (1.0 / numPoints)*(parEnd - parStart) + parStart for x in range(0, numPoints)]:
@@ -159,13 +194,12 @@ def CreateReferenceFace(edges, face, tolerance):
     # step_writer2.Transfer(referenceFace,STEPControl_ShellBasedSurfaceModel,True)
     # step_writer2.Transfer(ParWireShape, STEPControl_GeometricCurveSet, True)
     # step_writer2.Write("../data/allShapes.STEP")
-    #
+
     # sys.modules["__main__"].__dict__.update(globals())
     # sys.modules["__main__"].__dict__.update(locals())
     # raise ValueError("Break")
 
     return referenceFace
-
 
 
 def CreateDelaminationWire(delam_outline, tolerance):
@@ -620,14 +654,19 @@ class OCCModelBuilder(object):
                 pass
 
             # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
-            NoModelWireShape = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+            NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+
+            # Create reference parametric face for the no model zone using the NoModelWireShape
+            RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, self.PointTolerance)
 
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
-            ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace))
+            ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
 
             # step_writer2=STEPControl_Writer()
-            # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
             # step_writer2.Write("../data/OffsetTest.STEP")
             #
             # sys.modules["__main__"].__dict__.update(globals())
@@ -683,7 +722,7 @@ class OCCModelBuilder(object):
             # be split into its CONTACT and NOMODEL zones, and those pieces must be identified and
             # assigned BCTypes of CONTACT or NOMODEL
 
-            for (ToolShape, NoModelToolShape,RefParamFace,NoModelRefParamFace) in ToolShapes:
+            for (ToolShape, NoModelToolShape, RefParamFace, NoModelRefParamFace) in ToolShapes:
                 # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
                 # mapped to the (x,y) plane. 
                 if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
@@ -711,11 +750,11 @@ class OCCModelBuilder(object):
                     # be for CONTACT b.c.'s, and some NOMODEL.
                     #
 
-                    # We tell the difference by using a previously create reference face in parametric coordinates
+                    # We tell the difference by using a previously created reference face in parametric coordinates
                     # that includes solely the CONTACT zone. We deterimine a parametric coordinates point for
                     # each of these faces, and check it against the previously determine reference face
                     while NoModel_split_exp.More():
-                        nomodel_split_face_shape=NoModel_split_exp.Current()
+                        nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
 
                         (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
                         
@@ -728,10 +767,12 @@ class OCCModelBuilder(object):
                             BCTypes.append("CONTACT")
                             pass
                         else:
-                            BCTypes.append("NOMODEL")
+                            BCTypes.append("NONE")
                             pass
-                        
+
+                        NoModel_split_exp.Next()
                         pass
+
                     break
                 
                 pass

@@ -1807,7 +1807,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
                                          master=master_part)
             pass
         
-        elif face_adjacency['bcType'] == "NOMODEL":
+        elif face_adjacency['bcType'] == "NONE":
             print("    Nomodel, Body %s to %s" %(face_adjacency['name1'],face_adjacency['name2']))
             pass
         else:
