@@ -662,16 +662,16 @@ class OCCModelBuilder(object):
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
             ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
 
-            step_writer2=STEPControl_Writer()
-            # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            step_writer2.Write("../data/OffsetTest.STEP")
-
-            sys.modules["__main__"].__dict__.update(globals())
-            sys.modules["__main__"].__dict__.update(locals())
-            raise ValueError("Break")
+            # step_writer2=STEPControl_Writer()
+            # # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Write("../data/OffsetTest.STEP")
+            #
+            # sys.modules["__main__"].__dict__.update(globals())
+            # sys.modules["__main__"].__dict__.update(locals())
+            # raise ValueError("Break")
 
             pass
         
@@ -722,7 +722,7 @@ class OCCModelBuilder(object):
             # be split into its CONTACT and NOMODEL zones, and those pieces must be identified and
             # assigned BCTypes of CONTACT or NOMODEL
 
-            for (ToolShape, NoModelToolShape,RefParamFace,NoModelRefParamFace) in ToolShapes:
+            for (ToolShape, NoModelToolShape, RefParamFace, NoModelRefParamFace) in ToolShapes:
                 # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
                 # mapped to the (x,y) plane. 
                 if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
@@ -750,11 +750,11 @@ class OCCModelBuilder(object):
                     # be for CONTACT b.c.'s, and some NOMODEL.
                     #
 
-                    # We tell the difference by using a previously create reference face in parametric coordinates
+                    # We tell the difference by using a previously created reference face in parametric coordinates
                     # that includes solely the CONTACT zone. We deterimine a parametric coordinates point for
                     # each of these faces, and check it against the previously determine reference face
                     while NoModel_split_exp.More():
-                        nomodel_split_face_shape=NoModel_split_exp.Current()
+                        nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
 
                         (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
                         
