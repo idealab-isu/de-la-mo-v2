@@ -767,10 +767,12 @@ class OCCModelBuilder(object):
                             BCTypes.append("CONTACT")
                             pass
                         else:
-                            BCTypes.append("NOMODEL")
+                            BCTypes.append("NONE")
                             pass
-                        
+
+                        NoModel_split_exp.Next()
                         pass
+
                     break
                 
                 pass
