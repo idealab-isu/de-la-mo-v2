@@ -146,7 +146,7 @@ layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSI
 bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
             CohesiveInteraction=CohesiveInteraction,
             ContactInteraction=ContactInteraction,
-            delaminationlist= [ "../data/nasa-delam12-1.csv" ])
+            delaminationlist= [ "../data/nasa-delam12-2.csv" ])
             
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness

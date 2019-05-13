@@ -132,7 +132,7 @@ layer2.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSI
 bond_layers(DM,layer1, layer2, defaultBC="COHESIVE",
             CohesiveInteraction=CohesiveInteraction,
             ContactInteraction=ContactInteraction,
-            delaminationlist= [ "../data/nasa-delam12-2.csv" ])
+            delaminationlist= [ "../data/nasa-delam12-1.csv", "../data/nasa-delam12-2.csv"  ])
 
 
 # Create 3rd layer
