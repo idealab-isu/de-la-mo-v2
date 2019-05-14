@@ -1139,17 +1139,20 @@ layup direction, etc."""
 
         return cls(name=name,gk_layer=gk_layer,layupdirection=layupdirection,LayerSection=LayerSection,coordsys=coordsys)
 
-    def CreateFiberObject(self, DM, point, fibervec, normal, mp, fiberint=1.0, final_plotting=False):
+    def CreateFiberObject(self, DM, point, fibervec, normal, mp, fiberint=1.0, angle_error=0.01, final_plotting=False):
+        """ Utilize Autofiber orientation package to calculate optimal fiber orientations at each mesh
+         element centroid. """
         self.orientation = AutoFiber(self.gk_layer.DMObj,
                                      point, fibervec, normal,
                                      E=[mp[0], mp[1], mp[3]],
                                      nu=[mp[3], mp[4], mp[5]],
                                      G=[mp[6], mp[7], mp[8]],
-                                     fiberint=fiberint)
+                                     fiberint=fiberint, angle_error=angle_error)
 
         self.LayupFiberObject(DM, self.layupdirection, final_plotting=final_plotting)
 
     def LayupFiberObject(self, DM, layupdirection, final_plotting=False):
+        """ Use Autofiber object to determine layup orientation based on a fiber angle. """
         if self.orientation is not None:
             texcoord2inplane = self.orientation.layup(layupdirection, plotting=final_plotting)
 
