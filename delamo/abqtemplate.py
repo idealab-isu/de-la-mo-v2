@@ -46,7 +46,11 @@ if sys.version_info > (3,):
 
 # run mesh generation script (meshinstrs)
 
-###RUN_MESHINSTRS 
+###RUN_MESHINSTRS
+
+# run fiber orientation script (fiberinstrs)
+
+###RUN_FIBERINSTRS
 
 # run model-execution script (runinstrs)
 

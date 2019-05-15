@@ -28,6 +28,13 @@ from delamo.OCCModelBuilder import OCCModelBuilder
 from delamo.layer import Layer as OCCLayer
 import delamo
 
+try:
+    from autofiber import AutoFiber
+except ImportError:
+    print("AutoFiber module not installed. Advanced fiber laying functions not available.")
+    pass
+
+
 #import delamo.CADwrap
 
 # Abaqus constants that need to be globally
@@ -61,6 +68,10 @@ class DelamoModeler(object):
 
     meshinstrs=None
     """Codestore of ABAQUS meshing instructions"""
+
+    fiberinstrs=None
+    """Codestore of ABAQUS fiber orientation instructions"""
+
     runinstrs=None
     """Codestore of ABAQUS running instructions"""
 
@@ -88,7 +99,10 @@ class DelamoModeler(object):
     
     InitDict=None
     """A proxy object for a Python dictionary that is configured for execution with initinstrs"""
-    
+
+    autofiber=None
+    """Abaqus reference to the auto fiber class"""
+
     # Finite element parameters presumed to be defined
     # in the abqparams initialization scripts
     FEModel=None        # AssemblyInstrs
@@ -211,6 +225,13 @@ class DelamoModeler(object):
         self.exec_abaqus_script(self.initinstrs,self.meshinstrs,filename,globals)
         pass
 
+    def abaqus_fiber_functions(self,filename,globals):
+        """ Convenience routine for running a script in initinstrs
+        Methods or attribute accesses for variables defined in this script will
+        be referenced in fiberinstrs """
+        self.exec_abaqus_script(self.initinstrs,self.fiberinstrs,filename,globals)
+        pass
+
     def abaqus_run_functions(self,filename,globals):
         """ Convenience routine for running a script in initinstrs
         Methods or attribute accesses for variables defined in this script will 
@@ -249,6 +270,7 @@ class DelamoModeler(object):
         assemblyinstrs=codestore(initinstrs.codevariables) # share same variable dictionary as init instructions
         bcinstrs=codestore(initinstrs.codevariables) # share same variable dictionary as init instructions
         meshinstrs=codestore(initinstrs.codevariables) # share same variable dictionary as init instructions
+        fiberinstrs = codestore(initinstrs.codevariables)  # share same variable dictionary as init instructions
         runinstrs=codestore(initinstrs.codevariables) # share same variable dictionary as init instructions
 
         # imports from front matter in abqtemplate.py
@@ -287,6 +309,7 @@ class DelamoModeler(object):
         # which codestore was used to do the wrapping
         InitDict=initinstrs.wrap_class(dict)   # Dict that will operate during the initialization step
 
+        autofiber=fiberinstrs.preexisting_variable("AutoFiber_abq")
 
         FEModel=assemblyinstrs.preexisting_variable("FEModel")
         LaminateAssembly=assemblyinstrs.preexisting_variable("LaminateAssembly")
@@ -319,6 +342,7 @@ class DelamoModeler(object):
                assemblyinstrs=assemblyinstrs,
                bcinstrs=bcinstrs,
                meshinstrs=meshinstrs,
+               fiberinstrs=fiberinstrs,
                runinstrs=runinstrs,
                globals=globals,
                abq=_abq,
@@ -330,6 +354,7 @@ class DelamoModeler(object):
                assembly=_assembly,
                connector=_connector,
                InitDict=InitDict,
+               autofiber=autofiber,
                FEModel=FEModel,
                LaminateAssembly=LaminateAssembly,
                stepfile=stepfile,
@@ -356,6 +381,9 @@ class DelamoModeler(object):
 
         # ...abqfuncs_mesh.py library
         DM.abaqus_mesh_functions(os.path.join(thisdir,"abqfuncs_mesh.py"),globals)
+
+        # ...abqfuncs_fiber.py library
+        DM.abaqus_fiber_functions(os.path.join(thisdir,"abqfuncs_fiber.py"),globals)
 
         # ...abqfuncs_run.py library
         DM.abaqus_run_functions(os.path.join(thisdir,"abqfuncs_run.py"),globals)
@@ -422,7 +450,7 @@ class DelamoModeler(object):
         # Write out the generated python code
         # -----------------------------------------------
 
-        write_abq_script(self.initinstrs,self.assemblyinstrs,self.bcinstrs,self.meshinstrs,self.runinstrs,script_to_generate)
+        write_abq_script(self.initinstrs,self.assemblyinstrs,self.bcinstrs,self.meshinstrs,self.fiberinstrs,self.runinstrs,script_to_generate)
 
 
         pass
@@ -847,11 +875,23 @@ class LayerPart(Part):
             pass
         pass
 
-    def ApplyLayup(self,coordsys,layupdirection):
+    def ApplyLayup(self,coordsys,layupdirection,fiberorientation):
         """Assign self.fe_datum_csys and self.fe_materialorientation"""
 
-        coordsys.ApplyLayup(self,layupdirection)
-        
+        if fiberorientation is not None:
+            self.fe_materialorientation = self.DM.fiberinstrs.rewrapobj(self.fe_part.MaterialOrientation)
+            self.fe_materialorientation = self.fe_materialorientation(
+                region=self.DM.regionToolset.Region(
+                    cells=self.fe_part.cells),
+                orientationType=abqC.FIELD, axis=abqC.AXIS_3,
+                fieldName='%s_orientation' % self.name,
+                localCsys=None,
+                additionalRotationType=abqC.ROTATION_NONE,
+                angle=0.0,
+                additionalRotationField='',
+                stackDirection=abqC.STACK_3)
+        else:
+            coordsys.ApplyLayup(self, layupdirection)
         pass
 
 
@@ -1056,6 +1096,7 @@ class Layer(Assembly):
     def __init__(self,**kwargs):
         self.parts=None
         self.assemblies=collections.OrderedDict()
+        self.orientation=None
         for key in kwargs:
             assert(hasattr(self,key))
             setattr(self,key,kwargs[key])
@@ -1075,7 +1116,7 @@ class Layer(Assembly):
         return region
     
     @classmethod
-    def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, split=None, coordsys=None):
+    def CreateFromParams(cls,DM,create_params,name,LayerSection,layupdirection, meshsize=0.5, split=None, coordsys=None):
         """Create a layer given creation parameters to be passed to the geometry kernel, a name, ABAQUS Section, 
 layup direction, etc."""
         # create_params should be a tuple with all parameters to create_layer, except for the gk_layer object at the end
@@ -1098,7 +1139,44 @@ layup direction, etc."""
         # until "Finalize" method when the part list is extracted from
         # the geometry kernel
 
+        # Is this an appropriate place for this?
+        # gk_layer.DMObj = gk_layer.CreateDMObject(gk_layer.RefMold.Shape, meshsize)
+
         return cls(name=name,gk_layer=gk_layer,layupdirection=layupdirection,LayerSection=LayerSection,coordsys=coordsys)
+
+    def CreateFiberObject(self, DM, point, fibervec, normal, mp, fiberint=1.0, angle_error=0.01, final_plotting=False):
+        """ Utilize Autofiber orientation package to calculate optimal fiber orientations at each mesh
+         element centroid. """
+        self.orientation = AutoFiber(self.gk_layer.DMObj,
+                                     point, fibervec, normal,
+                                     E=[mp[0], mp[1], mp[3]],
+                                     nu=[mp[3], mp[4], mp[5]],
+                                     G=[mp[6], mp[7], mp[8]],
+                                     fiberint=fiberint, angle_error=angle_error)
+
+        self.LayupFiberObject(DM, self.layupdirection, final_plotting=final_plotting)
+
+    def LayupFiberObject(self, DM, layupdirection, final_plotting=False):
+        """ Use Autofiber object to determine layup orientation based on a fiber angle. """
+        if self.orientation is not None:
+            texcoord2inplane = self.orientation.layup(layupdirection, plotting=final_plotting)
+
+            layerfiber = DM.fiberinstrs.assign_variable(("%s_%s_fiber" % (self.name, layupdirection)).replace("-", "n"),
+                                                        (texcoord2inplane,
+                                                         self.orientation.vertices,
+                                                         self.orientation.vertexids,
+                                                         self.orientation.inplanemat,
+                                                         self.orientation.boxes,
+                                                         self.orientation.boxpolys,
+                                                         self.orientation.boxcoords,
+                                                         self.orientation.facetnormals))
+            for body in self.gk_layer.BodyList:
+                body.fiberorientation = DM.autofiber.CreateFromParams(body.Name, DM.FEModel, layerfiber)
+                body.fiberorientation.getMeshCenters()
+                body.fiberorientation.getFiberOrientations()
+                body.fiberorientation.CreateDiscreteField()
+        else:
+            raise ValueError("Fiber orientation is None. Must run CreateFiberObject on this layer first.")
 
     def Finalize(self,DM):
         """Build Python and Finite Element structure for this layer based on geometry kernel structure.
@@ -1117,8 +1195,8 @@ layup direction, etc."""
             part=LayerPart.FromGK3D(DM,gk_layerbody)  # This also adds it to to_be_saved
 
             #part.CreateInstance(dependent=abqC.ON)
-            
-            part.ApplyLayup(self.coordsys,self.layupdirection)
+
+            part.ApplyLayup(self.coordsys,self.layupdirection,gk_layerbody.fiberorientation)
             part.AssignSection(self.LayerSection)
             self.parts[gk_layerbody.Name]=part
             
@@ -1132,7 +1210,7 @@ layup direction, etc."""
 
 
     @classmethod
-    def CreateFromMold(cls,DM,mold,direction,thickness,name,Section,layup,coordsys=None):
+    def CreateFromMold(cls,DM,mold,direction,thickness,name,Section,layup,meshsize=0.5,coordsys=None):
         """Create a layer atop the specified mold. 
  * direction: "OFFSET" or "ORIG"
  * thickness: Thickness of layer (offsetting operation)
@@ -1141,7 +1219,7 @@ layup direction, etc."""
  * layup: Ply orientation in degrees
  * coordsys: Reference coordinate system for layup"""
 
-        gk_layer=OCCLayer.CreateFromMold(name,mold,thickness,direction,DM.modelbuilder.PointTolerance)
+        gk_layer=OCCLayer.CreateFromMold(name,mold,thickness,direction,DM.modelbuilder.PointTolerance,MeshSize=meshsize)
         
         return cls(name=name,gk_layer=gk_layer,layupdirection=layup,LayerSection=Section,coordsys=coordsys)
 
@@ -1758,5 +1836,3 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         pass
 
     pass
-    
-
