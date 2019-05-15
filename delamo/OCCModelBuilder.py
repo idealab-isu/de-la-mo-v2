@@ -104,6 +104,8 @@ def FaceFaceIntersect(face1, face2):
         exp.Next()
         pass
 
+    if (len(edge_list) == 0):
+        raise ValueError("Intersection failed! Check gap width for no model zone.")
 
 
     # build = BRep_Builder()
@@ -123,7 +125,9 @@ def FaceFaceIntersect(face1, face2):
     # assert (WireShape.Closed())
 
     # step_writer2 = STEPControl_Writer()
-    # step_writer2.Transfer(WireShape,STEPControl_GeometricCurveSet,True)
+    # step_writer2.Transfer(face1,STEPControl_ShellBasedSurfaceModel,True)
+    # step_writer2.Transfer(face2,STEPControl_ShellBasedSurfaceModel,True)
+    # step_writer2.Transfer(sectionCompoundEdges,STEPControl_GeometricCurveSet,True)
     # step_writer2.Write("../data/allShapes.STEP")
     #
     # sys.modules["__main__"].__dict__.update(globals())
@@ -135,28 +139,35 @@ def FaceFaceIntersect(face1, face2):
 
 def CreateReferenceFace(edges, face, tolerance):
     # Evaluate points on projected curve and evaluate the parametric points
-    numPoints = 200
+    totalNumPoints = 0;
+    if (len(edges) == 0):
+        raise ValueError("No input edges provided")
+
     curveParPts = []
     for edgecnt in range(len(edges)):
         edge = edges[edgecnt]
+        numEdgePoints = 100
+        totalNumPoints = totalNumPoints + numEdgePoints
 
         # Make sure this edge has a pcurve (2d projected curve) on this face
         edgefixer = ShapeFix_Edge()
         edgefixer.FixAddPCurve(edge, face, False)
 
         (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(edge, face)
-        # print(parStart, parEnd)
+        #print(parStart, parEnd)
 
         curve = curveHandle.GetObject()
-        for u in [x * (1.0 / numPoints)*(parEnd - parStart) + parStart for x in range(0, numPoints)]:
+        for indU in range(numEdgePoints):
+            u = indU * (1.0 / numEdgePoints) * (parEnd - parStart) + parStart
             curvePoint = curve.Value(u)
             u = curvePoint.X()
             v = curvePoint.Y()
-            curveParPts.append((u, v, 0))
+            #print(u, v)
+            curveParPts.append([u, v, 0])
             pass
 
-    curveParPts.append(curveParPts[0])
-
+    curvePointTemp = [curveParPts[0][0], curveParPts[0][1], curveParPts[0][2]]
+    curveParPts.append(curvePointTemp)
 
     # If there are n entries in the delam_outlist, one of which is doubled (start and end). There will be n-1 segments
     parPointsHArray = TColgp_HArray1OfPnt(1, len(curveParPts))
@@ -172,7 +183,7 @@ def CreateReferenceFace(edges, face, tolerance):
     if interpAPI.IsDone():
         delam_par_curve = interpAPI.Curve()
     else:
-        raise ValueError("Parametric curve interpolation failed\n")
+        raise ValueError("Parametric curve interpolation failed")
 
     # Convert a curve to edge and then to Shape
     delam_par_edge = BRepBuilderAPI_MakeEdge(delam_par_curve).Edge()
@@ -184,6 +195,8 @@ def CreateReferenceFace(edges, face, tolerance):
     P = gp_Pln()
     FaceBuilder = BRepBuilderAPI_MakeFace(P, topods_Wire(ParWireShape), True)
     referenceFace = FaceBuilder.Face()
+
+    print ("Created reference face")
 
     #error = FaceBuilder.Error()
     #if (error != BRepBuilderAPI_FaceError.BRepBuilderAPI_FaceDone):
@@ -344,7 +357,7 @@ class OCCModelBuilder(object):
         self.NormalTolerance=1e-6
         self.Debug=False
         self.NextUnique=0
-        self.GapWidth=0.5 # default gap of 1/2 mm
+        self.GapWidth=0.3 # default gap of 0.3 mm
         
         for argname in kwargs:
             if not hasattr(self,argname):
@@ -653,6 +666,19 @@ class OCCModelBuilder(object):
                 NoModelToolShape = mkOffset1.Shape()
                 pass
 
+
+            # step_writer2=STEPControl_Writer()
+            # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Write("../data/OffsetTest.STEP")
+            #
+            # sys.modules["__main__"].__dict__.update(globals())
+            # sys.modules["__main__"].__dict__.update(locals())
+            # raise ValueError("Break")
+
+
             # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
             NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
 
@@ -661,17 +687,6 @@ class OCCModelBuilder(object):
 
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
             ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
-
-            # step_writer2=STEPControl_Writer()
-            # # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Write("../data/OffsetTest.STEP")
-            #
-            # sys.modules["__main__"].__dict__.update(globals())
-            # sys.modules["__main__"].__dict__.update(locals())
-            # raise ValueError("Break")
 
             pass
         
@@ -1126,7 +1141,41 @@ class OCCModelBuilder(object):
         
         return FAL
 
+    def save_layer_surface_stl(self,stlfilename,layer1,layer2,MeshSize):
+        """ Save an .STL of the boundary between layer1 and layer2...
+        Must be called after finalization of BOTH layer1 and layer2."""
+        self.imprint_layers(layer1,layer2)  # imprint_layers operates on the full layers because the bodies might be
+        # subdivided differently on both sides
 
+        shellbuilder = BRep_Builder();
+        shell=TopoDS_Shell();
+        shellbuilder.MakeShell(shell);
+
+        # Should be able to connect these faces
+        # just with a BRep_Builder because they should
+        # already be topologically joined (otherwise
+        # we may need to sew them together
+        # with BRepBuilderAPI_Sewing())
+
+        for lb1 in layer1.BodyList:
+            for lb2 in layer2.BodyList:
+                #print("lb1 = %s; lb2=%s" % (lb1.Name,lb2.Name))
+                FacePairs=self.eval_face_pairs(lb1,lb2)
+
+                               
+                for postimprint_CommonFace in FacePairs:
+                    # postimprint_CommonFace is the LayerBodyFace from lb1... use it to build a shell 
+                    shellbuilder.Add(shell, postimprint_CommonFace.Face);
+                    pass
+                pass
+            pass
+
+        MeshDMObject = layer.Layer.CreateDMObject(shell,MeshSize)
+        MeshDMObject.SaveSTL(stlfilename)
+        pass
+    
+        
+        
     def save(self,cad_file_name,to_be_saved):
         step_writer=STEPControl_Writer()
         BodyNameList=[]
