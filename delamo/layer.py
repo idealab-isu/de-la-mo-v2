@@ -423,31 +423,33 @@ class DMObject:
         print("Maximum edge length in object : %s" % maxObjectEdgeLen)
         print("Object refined with %s triangles added." % numTrianglesAdded)
 
-    def SaveSTL(self, path, name):
-        if os.path.exists(path):
-            self.filepath = os.path.join(path, name)
-            f = open(self.filepath, "w+")
-
-            f.write("solid %s\n" % name)
-
-            for faceNum in range(0, len(self.faces)):
-                currentFace = self.faces[faceNum]
-                for trinum in range(0, len(currentFace.triangles)):
-                    f.write("facet normal {} {} {}\n".format(currentFace.triangles[trinum].facenormal[0],
-                                                           currentFace.triangles[trinum].facenormal[1],
-                                                           currentFace.triangles[trinum].facenormal[2]))
-                    f.write("outer loop\n")
-                    for i in range(0, 3):
-                        f.write("\tvertex {} {} {}\n".format(currentFace.triangles[trinum].vertices[i].point[0],
-                                                           currentFace.triangles[trinum].vertices[i].point[1],
-                                                           currentFace.triangles[trinum].vertices[i].point[2]))
-                    f.write("endloop\n")
-                    f.write("endfacet\n")
-            f.write("endsolid")
-            f.close()
-        else:
-            print("STL file path does not exist.")
-
+    def SaveSTL(self, filepath):
+        self.filepath = filepath
+        f = open(self.filepath, "w")
+        
+        f.write("solid %s\n" % (os.path.splitext(os.path.split(filepath)[1])[0]))
+        
+        for faceNum in range(0, len(self.faces)):
+            currentFace = self.faces[faceNum]
+            for trinum in range(0, len(currentFace.triangles)):
+                f.write("facet normal {} {} {}\n".format(currentFace.triangles[trinum].facenormal[0],
+                                                         currentFace.triangles[trinum].facenormal[1],
+                                                         currentFace.triangles[trinum].facenormal[2]))
+                f.write("outer loop\n")
+                for i in range(0, 3):
+                    f.write("\tvertex {} {} {}\n".format(currentFace.triangles[trinum].vertices[i].point[0],
+                                                         currentFace.triangles[trinum].vertices[i].point[1],
+                                                         currentFace.triangles[trinum].vertices[i].point[2]))
+                    pass
+                f.write("endloop\n")
+                f.write("endfacet\n")
+                pass
+            pass
+        
+        f.write("endsolid")
+        f.close()
+        pass
+    pass
 
 class DMFace:
 

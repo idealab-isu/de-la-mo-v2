@@ -14,8 +14,8 @@ damage_directory = os.path.join("..","data","TRI_delams")
 output_directory = "04_Delam_plate_output"
 
 boundary_layers = glob.glob(os.path.join(output_directory,"layerboundary_PREDAMAGE_*.stl"))
-if len(boundary_layers) != 7:
-    raise ValueError("Did not find exactly seven PREDAMAGE .stl files in %s" % (output_directory))
+if len(boundary_layers) != 15:
+    raise ValueError("Did not find exactly fifteen PREDAMAGE .stl files in %s" % (output_directory))
 
 linenumbers = [ int(re.match(r"""layerboundary_PREDAMAGE_([0-9]+)[.]stl""",os.path.split(boundary_layer_filename)[1]).group(1)) for boundary_layer_filename in boundary_layers ]
 linenumbers.sort()
@@ -34,7 +34,7 @@ for damage_filename in damage_filenames:
     
     assert(delam_layernum > 0) # layer #1 is the first boundary
     
-    assert((delam_outline_raw[3,:]==0.0)) # surface z coordinate assumed to be zero everywhere
+    assert((delam_outline_raw[3,:]==0.0).all()) # surface z coordinate assumed to be zero everywhere
 
     delam_depth = delam_layernum*thickness
 

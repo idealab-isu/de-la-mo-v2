@@ -80,7 +80,7 @@ thickness = 0.199
 Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
 
 # script_directory = os.path.split(script_to_generate)[0]
-# Mold.DMObject.SaveSTL(script_directory, "Mold.stl")
+# Mold.DMObject.SaveSTL(os.path.join(script_directory, "Mold.stl"))
 
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,
