@@ -680,12 +680,14 @@ class OCCModelBuilder(object):
             # sys.modules["__main__"].__dict__.update(locals())
             # raise ValueError("Break")
 
+            if False:
+                # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
+                NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
 
-            # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
-            NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+                # Create reference parametric face for the no model zone using the NoModelWireShape
+                RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, self.PointTolerance)
 
-            # Create reference parametric face for the no model zone using the NoModelWireShape
-            RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, self.PointTolerance)
+            RefNoModelParamFace = None
 
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
             ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
