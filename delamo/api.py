@@ -236,6 +236,9 @@ class DelamoModeler(object):
                    pointtolerancefactor=100.0, # How much larger the tolerance should be in Abaqus
                    normaltolerance=100e-4,
                    tangenttolerance=100e-4,
+                   GapWidth=0.3, # default gap of 0.3 mm
+                   STLMeshSize=3.0,
+                   Debug=False,
                    license_key=""):
         """Initialize the DelamoModeler, creating the codestores for initinstrs, assemblyinstrs, bcinstrs, meshinstrs, and runinstrs, and
         specifying the default tolerances"""
@@ -304,7 +307,7 @@ class DelamoModeler(object):
         #BodyDB=assemblyinstrs.rewrapobj(BodyDB_build)
             
         # Initialize the OpenCascade Model Builder
-        modelbuilder = OCCModelBuilder(PointTolerance=pointtolerance,NormalTolerance=normaltolerance)
+        modelbuilder = OCCModelBuilder(PointTolerance=pointtolerance,NormalTolerance=normaltolerance,GapWidth=GapWidth,STLMeshSize=STLMeshSize,Debug=Debug)
 
         
         # Define default finite element tolerances
@@ -1748,7 +1751,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
             
             output_directory=delamo.process.output_dir(delamo_basename)
             delamo_fname=os.path.join(output_directory,"layerboundary_%s_%5.5d.stl" % (delamo_phase,delamo_sourceline))
-            DM.modelbuilder.save_layer_surface_stl(delamo_fname,layer1.gk_layer,layer2.gk_layer,MeshSize)
+            DM.modelbuilder.save_layer_surface_stl(delamo_fname,layer1.gk_layer,layer2.gk_layer)
             pass
         
         
