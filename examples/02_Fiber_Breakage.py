@@ -165,7 +165,7 @@ layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness
 layer4.Finalize(DM)
 layer4.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-bond_layers(DM,layer3, layer4)
+bond_layers(DM,layer3, layer4,master_layer=layer3)
 
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
