@@ -18,6 +18,7 @@ import os
 import os.path
 import ast
 import numpy as np
+import traceback
 
 from delamo.codegen import codestore
 from delamo.codegen import namedbinding_wrapper
@@ -29,10 +30,10 @@ from delamo.layer import Layer as OCCLayer
 import delamo
 
 try:
-    from autofiber import AutoFiber
+    from autofiberlib import AutoFiber
 except ImportError:
-    print("AutoFiber module not installed. Advanced fiber laying functions not available.")
-    pass
+    sys.stderr.write("AutoFiberlib not properly installed or missing dependencies. See:\n\nTraceback follows\n---------------------------\n\n")
+    traceback.print_exc()
 
 
 #import delamo.CADwrap

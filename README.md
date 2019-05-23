@@ -16,11 +16,24 @@ Apache 2.0 license. See the LICENSE.txt file for details
 * `delamo/`: Contains the python package _delamo_
 * `examples/`: Contains example python scripts which demonstrate how to use _delamo_
 * `examples/data/`: Contains data files used in the example scripts
+* `autofiberlib/`: Git submodule to the [AutoFiberlib](https://github.com/nscheirer/autofiberlib) repository. Contains
+advanced functions for optimizing composite fiber layups based on geodesic paths and strain energy minimization. (Optional)
 
 ## Quickstart Build Instructions
 1. Acquire requirements listed at http://thermal.cnde.iastate.edu/de-la-mo.xhtml
 2  python setup.py build
 3. python setup.py install
+
+## Cloning Instructions
+In order to include the autofiber capabilities during cloning the following command should be run:
+```
+git clone --recursive [Url to this repo]
+```
+
+If you have already cloned this repository the following is used to load the autofiberlib submodule:
+```
+git submodule update --init
+```
 
 ## Installation Structure
 

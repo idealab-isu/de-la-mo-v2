@@ -1,0 +1,3 @@
+[submodule "autofiberlib"]
+	path = autofiberlib
+	url = https://github.com/nscheirer/autofiberlib.git
