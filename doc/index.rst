@@ -28,30 +28,32 @@ Requirements
 ============
 De-la-mo is designed to work on Windows, Linux, and Macintosh given
 the required dependencies.
-* CMake (Build tool)
-* C++ Compiler compatible with ACIS library and your Python distribution (usually Visual Studio on Windows or gcc on Linux)
-* Swig (Python interface generator for C/C++)
 * appdirs (Python library for identifying directory)
 * rply (Python parser generator library)
 * baron (Python abstract syntax tree library)
 * redbaron (Python abstract syntax tree interface)
 * numpy (Python numerical computation class library)
-* ACIS (Commercial solid modeling kernel)
+* pythonocc (3D CAD development framework built on the 3D CAD kernel `OCE project <https://github.com/tpaviot/oce/>`_)
 * ABAQUS (Commercial finite element package)
 
 The manufacturing instructions in De-la-mo take the form of a Python
 script, so `Python <https://www.python.org>`_ 2.7 or newer is required.
 In many cases you may want a more complete Python distribution such as
-`Anaconda <https://www.anaconda.com>`_. You will also want a compatible
-C++ compiler (usually Visual Studio on Windows or gcc on Linux)
+`Anaconda <https://www.anaconda.com>`_, Anaconda includes easily installable
+prebuilt binaries of pythonocc which greatly simplifies the install process.
 
-De-la-mo requires the `CMake <https://www.cmake.org>`_ build tool and the `SWIG <https://www.swig.org>`_ interface generator. If using Anaconda, these
-packages can installed with::
+De-la-mo-v2 utilizes the `pythonocc framework <https://github.com/tpaviot/pythonocc-core>`_
+to perform all of its geometric operations. Prebuilt binaries for Windows, Linux,
+and Mac for Python versions greater than 2.7 are available on Anaconda
+and can be installed with the following command::
 
-  conda install -c anaconda cmake 
-  conda install -c anaconda swig 
+   conda install -c conda-forge -c dlr-sc -c pythonocc -c oce pythonocc-core==0.18.1 python=3.5
 
-De-la-mo depends on the `numpy <https://www.numpy.org>`- numerical
+
+Replace "3.5" with your desired Python version number such as "2.7" or "3.6" in the previous
+command.
+
+De-la-mo depends on the `numpy <https://www.numpy.org>`_ numerical
 python library and the `baron <https://github.com/PyCQA/baron>`_ and
 `redbaron <https://github.com/PyCQA/redbaron>`_ packages for dynamic
 modification and conversion of scripts. Numpy is included with
@@ -89,13 +91,6 @@ shell (such as an Anaconda shell) configured for your desired Python environment
   python setup.py build
   python setup.py install
 
-The current version of De-la-mo requires the `ACIS
-<https://www.spatial.com/products/3d-acis-modeling>`_ 3D modeling
-kernel. ACIS generally requires a commercial license, but such licenses may be
-available for low or no cost to academic users.
-You will need to provide the location of your ACIS folder (directory) to
-the CMake build tool.
-
 De-la-mo requires the `ABAQUS <https://www.3ds.com/products-services/simulia/products/abaqus/>`_ finite element package. You should make sure the  'abaqus.bat' (Windows) or 'abaqus' (Other platforms) script is available in your command path.
 This documentation will presume some familiarity with ABAQUS, Python, and
 Python scripting in ABAQUS. If any of this will be new to you, we highly
@@ -107,45 +102,13 @@ Installation
 ============
 
 Be sure the prerequisite components (listed under Requirements, above)
-are installed. Download or clone the De-la-mo source tree. Create
-a new folder (directory) to store the build tree, and then run the
-CMake configurator, e.g.::
+are installed. Download or clone the `De-la-mo-v2 <https://git.linux.iastate.edu/NASA-AK/de-la-mo-v2>`_ source tree. Then
+execute the following in the root directory of the de-la-mo source tree::
 
-  mkdir build
-  cd build
-  cmake-gui ..
-
-You will need to press the "Configure" button to make a first
-configuration attempt. If ACIS is not automatically found, you
-may need to manually set the ACIS_ROOT parameter to the full path
-to the root of the ACIS tree.
-
-You may need to manually find some prerequistes if cmake did not
-automatically find them. You may also want to modify
-the installation location APP_INSTALL_PREFIX (but be sure to also
-modify NURBS_INSTALL_PREFIX in parallel). You do NOT need to
-enable MODELBUILDER_INSTALL_APPS or NURBS_INSTALL_APPS as those
-applications are debugging test cases for the De-la-mo modelbuilder
-and NURBS engines. Look for any other errors (Do not worry about MODELBUILDER_DEBUG_LEVEL being set to ERROR, as that is a valid setting!)
-
-You should press "Configure" at least a second time, and then "Generate".
-You can then use your selected build tool to build and install De-La-Mo,
-e.g.::
-
-  make
-  make install
-
-Check for and troubleshoot any compilation or install errors. You may
-need root or administrator privledges to do the install.
-
-A path file (*.pth) is generated during the build process and then copied to the system ${PYTHON_SITE_PACKAGES} directory during installation.  This path file points to the installation `delamo/` directory and enables python scripts to import delamo without having to have delamo itself placed in ${PYTHON_SITE_PACKAGES}.
-
-Finally you will need to make your ACIS license available to De-La-Mo.
-To run the examples, place the license (which is a string of uppercase
-alphanumeric characters) in a text file named "license.dat" in the
-examples/ folder. 
-
-
+   git clone --recursive [Url to repo]
+   cd de-la-mo-v2/
+   python setup.py build
+   python setup.py install
 
 Running De-la-mo
 ================
@@ -162,7 +125,7 @@ the installation will place it into your path, such as into
   cd examples/
   delamo_process 01_Planar_Single_Delam.py
 
-On Windows you may need to explicity call the python interpreter from
+On Windows you may need to explicitly call the python interpreter from
 a command prompt::
 
   python c:\delamo\scripts\delamo_process c:\delamo\examples\01_Planar_Single_Delam.py
@@ -227,7 +190,6 @@ similar to the following::
   SUCCESS: Saved SAT file!
 
 If the output you see contains error messages or is not similar to the above, troubleshoot the errors. The most likely problems are:
-* Missing or malformed ACIS license.dat file (should be in your current directory when you run delamo_process)
 * Wrong Python version or Python installation being used
 * Missing prerequisite libraries
 See the troubleshooting section below for more help. You can also
@@ -254,9 +216,9 @@ for you to initiate the finite element analysis.
 
    Figure 1: Screenshot of CAD model loaded into ABAQUS.
 
-Figure 1 shows as screenshot of the example loaded into ABAQUS.
+Figure 1 shows a screenshot of the example loaded into ABAQUS.
 You can browse through
-the various ABAQUS parts, representing layers or layer fragment,
+the various ABAQUS parts, representing layers or layer fragments,
 and the corresponding instances in the assembly. You can
 also see the configured section (specified in abqparams_CFRP.py).
 You can see the interactions representing cohesive and contact models
@@ -276,39 +238,30 @@ This tutorial assumes that De-la-mo is correctly installed and
 operational, and that you have practiced the "Running De-la-mo"
 instructions listed above. It will walk you through
 the creation of a simple layer-by-layer model.
-This tutorial follows the example 02_Curved_Single_Delam.py. 
+This tutorial follows the example 01_Curved_Single_Delam.py.
 
 Your De-la-mo script generally starts with a series of Python
 import statements that provide access to the Delamo libraries and
 routines and to basic components of Numpy and the Python standard
 library::
 
-  import numpy as np
-  
-  import delamo.CADwrap
-  from delamo.api import DelamoModeler 
-  from delamo.api import Layer
-  from delamo.api import bond_layers
-  from delamo.api import SimpleCoordSys
-  from delamo import process
-  
-  import os
-  import sys
+   import numpy as np
 
-The ACIS solid modeler requires a license key. Usually your next step
-is to load in the license key::
+   from delamo.api import DelamoModeler
+   from delamo.api import Layer
+   from delamo.api import bond_layers
+   from delamo.api import SimpleCoordSys
+   from delamo import process
+   from delamo.layer import LayerMold
 
-  # Read ACIS license key
-  acis_license = delamo.CADwrap.read_license_key(filename="license.dat")
+   import os
 
-Then usually you initialize the delamo modeler, giving it the
-license key you just loaded::
+Then usually you initialize the delamo modeler::
 
-  # Initialize the DeLaMo model
-  DM=DelamoModeler.Initialize(globals(),
-                              facepointtolerancefactor=3.0,
-                              normaltolerance=100e-4,
-                              license_key=acis_license)
+   # Initialize the DeLaMo model
+   DM=DelamoModeler.Initialize(globals(),
+                               pointtolerancefactor=100.0,
+                               normaltolerance=100e-4)
 
 De-la-mo is designed to facilitate automated multi-step processes that include
 steps such as creation of an original model, insertion of damage, etc.
@@ -318,13 +271,13 @@ the process.output_filenames() function::
 
   (script_to_generate,
    cad_file_path_from_script,
-   layer_boundary_template) = process.output_filenames("02_Curved_Single_Delam",phase="ORIGINAL")
+   layer_boundary_template) = process.output_filenames("01_Curved_Single_Delam",phase="ORIGINAL")
 
 The first parameter to process.output_filenames() is the base name of
 the containing script (i.e. with the .py removed). This allows the
 generated ABAQUS script and CAD file to be named according to the
 De-la-mo script. (If you copy or
-rename the script you will need to change the first parameter. )
+rename the script you will need to change the first parameter.)
 
 You also need to give process.output_filenames() a keyword parameter
 specifiying the phase, which should always be "ORIGINAL". You may also
@@ -448,8 +401,8 @@ ABAQUS isn't running yet! Instead, De-la-mo queues them up and inserts them into
 ABAQUS script. The fact that these functions don't get called until later (when ABAQUS executes) is mostly transparent.
 You generally can use such functions as normal. They are implemented as proxy objects that record their operations that,
 when called, return new proxy objects. The fact that these calls are not made until later does have a few side effects: 
-* It will not work to pass these objects to functions that need to interrogate them NOW. It is OK long as they end up getting passed eventually to ABAQUS (which is usually the case), but it is not possible for  output to be extracted or to make a  flow control decision (such as an if statement or the number of iterations in a for loop) based on their value.
-* The calls to these functions and methods are classified based on the origin of the proxy objects into initialization calls, assembly calls, boundary condition calls, mesh calls, and run calls. All initialization calls are executed first, then assembly calls, then boundary condition calls, then mesh calls, and finally run calls. As a result the order of execution in the generate ABAQUS script may be different from the order of execution in the De-la-mo script. This is beneficial because it helps ensure that the internal solid model inside ABAQUS is complete and assembled before boundary conditions or meshing  -- which may be dependent on the assembly -- are started.
+* It will not work to pass these objects to functions that need to interrogate them NOW. It is OK so long as they end up getting passed eventually to ABAQUS (which is usually the case), but it is not possible for the output to be extracted or to make a flow control decision (such as an if statement or the number of iterations in a for loop) based on their value.
+* The calls to these functions and methods are classified based on the origin of the proxy objects into initialization calls, assembly calls, boundary condition calls, mesh calls, fiber calls, and run calls. All initialization calls are executed first, then assembly calls, then boundary condition calls, then mesh calls, then fiber calls, and finally run calls. As a result the order of execution in the generate ABAQUS script may be different from the order of execution in the De-la-mo script. This is beneficial because it helps ensure that the internal solid model inside ABAQUS is complete and assembled before boundary conditions or meshing  -- which may be dependent on the assembly -- are started.
 
 You can insert a line such as::
 
@@ -459,7 +412,7 @@ to take an existing variable (in this case LaminateAssembly, which is specified 
 abqparams_CFRP.py) and create a new proxy object that reclassifies operations into a
 different class of calls. In this case LaminateAssemblyMeshing will work just like
 LaminateAssembly, except that method calls on LaminateAssemblyMeshing will be executed
-among  meshing calls phase instead of among initialization calls (because LaminateAssembly
+among the meshing calls phase instead of among initialization calls (because LaminateAssembly
 was defined in the initialization script). 
 
 Continuing our tutorial, we assign a variable representing how thick we will make the layers::
@@ -476,24 +429,34 @@ axis (which should be normal). The third axis is defined from the cross product:
 
 Material (i.e. fiber) directions will be specified relative to this coordinate system.
 In the current version of De-la-mo this coordinate system is the same everywhere within
-your De-la-mo model. A future version will assist you in generating curvilinear coordinates
-based on a lamina draping model.
+your De-la-mo model. De-la-mo contains functions that will utilize the fiber layup strategies
+employed by the `autofiber <https://github.com/nscheirer/autofiberlib>`_ library. This library is included in the de-la-mo package but
+specific details on the method and a standalone package can be observed `here <https://github.com/nscheirer/autofiber>`_. De-la-mo
+will operate perfectly well without the AutoFiber library fiber layup methods but the fiber
+orientations defined by the coordsys is regarded as less accurate in certain curved model cases,
+especially doubly-curved surfaces. See example "05_Curved_Single_Delam_AutoFiber" to see how to incorporate
+the AutoFiber orientations in the tutorial we are going through right now.
 
 Use a CAD package such as SolidWorks or Catia to create a mold surface.
-For example, the Mold surface can be created in SolidWorks using the freeform editor tool. You can first create a flat surface by extruding a line and make use of the freeform feature to change the shape of the surface. The following `tuturial <https://grabcad.com/tutorials/tutorial-for-beginners-how-to-free-form-surface-in-solidworks>`_ provides a detailed example of creating a free form suface in SolidWorks.
-Save the mold in ACIS (".sat") format. Then you can create a De-la-mo layer from
-the mold by specifying the filename in the second parameter to CreateFromSAT()::
-  
-  layer1 = Layer.CreateFromSAT(DM,"data/CurvedMold1.sat",delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_1", LaminaSection,0,coordsys=coordsys)
+For example, the Mold surface can be created in SolidWorks using the freeform editor tool. You can first create a flat surface by extruding a line and make use of the freeform feature to change the shape of the surface. The following `tuturial <https://grabcad.com/tutorials/tutorial-for-beginners-how-to-free-form-surface-in-solidworks>`_ provides a detailed example of creating a free form surface in SolidWorks.
+Save the mold in ACIS (".sat") format. The mold can then be loaded into De-la-mo as follows::
+
+   # Load a NURBS mold surface from a file
+   Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
+
+Then you can create a De-la-mo layer from the mold by specifying the mold variable in the second
+parameter to CreateFromMold()::
+
+   layer1 = Layer.CreateFromMold(DM,Mold,"OFFSET",thickness,"Layer_1",LaminaSection,0,coordsys=coordsys)
 
 This function performs an offsetting operation (similar to extrusion) of the specified thickness.
 It creates a De-la-mo layer object that wraps both an underlying geometry object and an underlying ABAQUS object.
 It applies the specified ABAQUS section (LaminaSection in this case) to the newly created layer.
-The third parameter must either be delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION, which determine
-which the direction of the offsetting  (the easiest way to pick the direction is to try an extrusion with a large amount of thickness
+The third parameter must either be delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION, which determines
+which the direction of the offsetting (the easiest way to pick the direction is to try an extrusion with a large amount of thickness
 and see if it extruded the wrong way). 
 
-Once you are done creating a layer, including any operations -- such as inclusion of fiber breakage or matrix cracking that might
+Once you are done creating a layer, including any operations -- such as advanced fiber layup with AutoFiber, inclusion of fiber breakage, or matrix cracking that might
 split the layer into multiple pieces -- you must finalize the layer::
 
   layer1.Finalize(DM)
@@ -519,11 +482,11 @@ using the replay file (abaqus.rpy) using the same techniques illustrated
 in the material and section example, above. In this case we create a
 fixed boundary condition by calling the
 EncastreBC method of the ABAQUS object FEModel::
-  
-  FixedPoint=[-50.0,-24.0,268.42] 
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                   createStepName=ApplyForceStep.name,
-                   region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+
+   FixedPoint=[-40.0,-50.0,0.1]
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 In the above example, a unique name is guaranteed by appending a
 unique number from DM.get_unique(). The region (surface) to which the boundary
@@ -538,15 +501,14 @@ If you do, it may not uniquely identify a face. One trick is to query
 several nodes and interpolate between them. 
 
 The first layer has now been completely set up. We can now create the
-second layer similar to how we created the first. The primary difference
-will be that we will use the CreateFromLayer() method instead of CreateFromSAT(), and we will use a different layup orientation of -45 degrees::
+second layer similar to how we created the first with the CreateFromMold() function, and we will use a different layup orientation of -45 degrees::
 
-  # Create 2nd layer
-  layer2 = Layer.CreateFromLayer(DM,layer1.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_2", LaminaSection,-45)
-  layer2.Finalize(DM)
-  layer2.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+   # Create 2nd layer
+   layer2 = Layer.CreateFromMold(DM,layer1.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_2", LaminaSection,-45,coordsys=coordsys)
+   layer2.Finalize(DM)
+   layer2.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-Now that we have two layers, we cand bond them together. This bonding
+Now that we have two layers, we can bond them together. This bonding
 call uses a tie (continuity boundary condition)::
 
   # Bond the layers together
@@ -555,18 +517,18 @@ call uses a tie (continuity boundary condition)::
 We also need to apply a fixed boundary condition to the edge of this layer,
 but at a z value increased by the thickness::
 
-  # Update and add point marker for fixed faced boundary condition
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer2.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+   # Update and add point marker for fixed faced boundary condition
+   FixedPoint[2]+=thickness
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer2.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 Now we can create a third layer, this time at +45 degree orientation::
 
-  # Create 3rd layer
-  layer3 = Layer.CreateFromLayer(DM,layer2.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_3",LaminaSection,45)
-  layer3.Finalize(DM)
-  layer3.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+   # Create 3rd layer
+   layer3 = Layer.CreateFromMold(DM,layer2.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_3",LaminaSection,45,coordsys=coordsys)
+   layer3.Finalize(DM)
+   layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
 This time, let us bond but with a delamination. We will specify
 defaultBC to be delamo.CADwrap.BC_COHESIVE, which overrides the
@@ -576,83 +538,93 @@ area (CohesiveInteraction) and the delaminated zone
 (ContactInteraction). In addition a small ring around the delamination
 is left with no boundary condition to help with convergence. The
 coordinates of the delamination outline are extracted from the
-specified .csv file and projected onto the boundary. 
+specified .csv file and projected onto the boundary::
+
+   bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
+               CohesiveInteraction=CohesiveInteraction,
+               ContactInteraction=ContactInteraction,
+               delaminationlist= [ "../data/nasa-delam12-2.csv" ])
 
 As before, the 3rd layer needs its edge boundary condition::
 
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+   FixedPoint[2]+=thickness
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer3.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 We can then create layers 4-8 similarly::
-  
-  # Create 4th layer
-  layer4 = Layer.CreateFromLayer(DM,layer3.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_4",LaminaSection,90)
-  layer4.Finalize(DM)
-  layer4.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-  bond_layers(DM,layer3, layer4)
+   # Create 4th layer
+   layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_4",LaminaSection,90,coordsys=coordsys)
+   layer4.Finalize(DM)
+   layer4.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-  # Update and add point marker for fixed faced boundary condition
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer4.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+   bond_layers(DM,layer3, layer4)
+
+   # Update and add point marker for fixed faced boundary condition
+   FixedPoint[2]+=thickness
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer4.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
 
-  # Create 5th layer
-  layer5 = Layer.CreateFromLayer(DM,layer4.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_5",LaminaSection,90)
-  layer5.Finalize(DM)
-  layer5.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+   # Create 5th layer over the layer 4 or the stiffener contour, if present
+   # ... for we just tell it to follow the layer 4 contour, which
+   # the stiffener automagically expanded
+   layer5 = Layer.CreateFromMold(DM,layer4.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_5",LaminaSection,90,coordsys=coordsys)
+   layer5.Finalize(DM)
+   layer5.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-  bond_layers(DM,layer4, layer5)  
-    
-  # Update and add point marker for fixed faced boundary condition
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer5.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
-  
-  # Create 6th layer
-  layer6 = Layer.CreateFromLayer(DM,layer5.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_6",LaminaSection,45)
-  layer6.Finalize(DM)
-  layer6.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+   bond_layers(DM,layer4, layer5)
 
-  bond_layers(DM,layer5, layer6)
+   # Update and add point marker for fixed faced boundary condition
+   FixedPoint[2]+=thickness
+   FixedPoint[1]-=.07 # accommodate outward shift as we go up
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer5.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
 
-  # Update and add point marker for fixed faced boundary condition
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer6.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
-  
-  
-  # Create 7th layer
-  layer7 = Layer.CreateFromLayer(DM,layer6.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_7",LaminaSection,-45)
-  layer7.Finalize(DM)
-  layer7.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
-  
-  bond_layers(DM,layer6, layer7)
-  
-  # Update and add point marker for fixed faced boundary condition
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer7.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
-  
-  # Create 8th layer
-  layer8 = Layer.CreateFromLayer(DM,layer7.gk_layer,delamo.CADwrap.OFFSET_DIRECTION,thickness,"Layer_8",LaminaSection,0)
-  layer8.Finalize(DM)
-  layer8.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
-  
-  bond_layers(DM,layer7, layer8)
 
-  # Update and add point marker for fixed faced boundary condition
-  FixedPoint[2]+=thickness
-  FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                     createStepName=ApplyForceStep.name,
-                     region=layer8.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
+   # Create 6th layer
+   layer6 = Layer.CreateFromMold(DM,layer5.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_6",LaminaSection,45,coordsys=coordsys)
+   layer6.Finalize(DM)
+   layer6.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+
+   bond_layers(DM,layer5, layer6)
+
+   # Update and add point marker for fixed faced boundary condition
+   FixedPoint[2]+=thickness
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer6.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
+
+
+   # Create 7th layer
+   layer7 = Layer.CreateFromMold(DM,layer6.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_7",LaminaSection,-45,coordsys=coordsys)
+   layer7.Finalize(DM)
+   layer7.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+
+   bond_layers(DM,layer6, layer7)
+
+   # Update and add point marker for fixed faced boundary condition
+   FixedPoint[2]+=thickness
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer7.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
+
+
+   # Create 8th layer
+   layer8 = Layer.CreateFromMold(DM,layer7.gk_layer.OffsetMold(),"OFFSET",thickness,"Layer_8",LaminaSection,0,coordsys=coordsys)
+   layer8.Finalize(DM)
+   layer8.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
+
+   bond_layers(DM,layer7, layer8)
+
+   # Update and add point marker for fixed faced boundary condition
+   FixedPoint[2]+=thickness
+   FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                      createStepName=ApplyForceStep.name,
+                      region=layer8.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
   
 Now we've created the entire model. Let's add a selectable surface
 that can be identified from ABAQUS/CAE::
@@ -660,29 +632,30 @@ that can be identified from ABAQUS/CAE::
   # Can define a "Surface" that is visible in the Abaqus output database
   # This is a direct ABAQUS call on the part object
   # within layer1 (assumes layer1 is not split due to fiber/matrix breakage)
-  layer1.singlepart.fe_part.Surface(name="ForceSurface",
-                                    side1Faces=layer1.singlepart.GetPartFace((24.0,24.0,thickness*0),DM.pointtolerance))
+   layer1.singlepart.fe_part.Surface(name="ForceSurface",
+                                     side1Faces=layer1.singlepart.GetPartFace((-49.0,-49.0,thickness*0),0.1))
 
 We also need to apply a load for the structural test,
 in this case a surface traction::
 
-  ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa 
-  # Call ABAQUS SurfaceTraction method
-  # Again, this came from looking at ABAQUS replay (.rpy) output
-  # Observe again that all ABAQUS symbolic constants need the "abqC"
-  # prefix. 
-  FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
-                          createStepName=ApplyForceStep.name,
-                          region=layer1.singlepart.GetInstanceFaceRegionSurface((24.0,24.0,thickness*0.0),DM.pointtolerance),
-                          distributionType=abqC.UNIFORM,
-                          field='',
-                          localCsys=None,
-                          traction=abqC.GENERAL,
-                          follower=abqC.OFF,
-                          resultant=abqC.ON,
-                          magnitude=np.linalg.norm(ForceVector),
-                          directionVector=((0.0,0.0,0.0),tuple(ForceVector/np.linalg.norm(ForceVector))),
-                          amplitude=abqC.UNSET)
+   ForceVector=[ 0.0, 0.0, -2e-2 ] # Units of MPa
+
+   # Call ABAQUS SurfaceTraction method
+   # Again, this came from looking at ABAQUS replay (.rpy) output
+   # Observe again that all ABAQUS symbolic constants need the "abqC"
+   # prefix.
+   FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
+                           createStepName=ApplyForceStep.name,
+                           region=layer1.singlepart.GetInstanceFaceRegionSurface((-49.0,-49.0,thickness*0.0),0.1),
+                           distributionType=abqC.UNIFORM,
+                           field='',
+                           localCsys=None,
+                           traction=abqC.GENERAL,
+                           follower=abqC.OFF,
+                           resultant=abqC.ON,
+                           magnitude=np.linalg.norm(ForceVector),
+                           directionVector=((0.0,0.0,0.0),tuple(ForceVector/np.linalg.norm(ForceVector))),
+                           amplitude=abqC.UNSET)
 
 And finally, the last line of the script must be the finalization
 which writes out the generated script and CAD file::
@@ -694,7 +667,7 @@ That's all there is to it!!!
 Automated damage insertion and multi-step processes
 ===================================================
 De-la-mo is designed to facilitate automatic insertion of
-meeasured damage based on nondestructive evaluation
+measured damage based on nondestructive evaluation
 data. See examples/07_ComputedTomography_Damage.py
 for an example.
 
@@ -765,7 +738,7 @@ the steps are:
 4. (Optional) FEINTERACT PREDAMAGE to perform finite element on the undamaged model
 5. GEN APPLY_DAMAGE to run the user-written damage script that adds delamination outline .csv files to the _output/ directory.
 6. GEN DAMAGED to generate the De-la-mo script with layer bonding instructions
-   modified to insert the delaminations specified in the APPLY_DAMAGE step. 
+modified to insert the delaminations specified in the APPLY_DAMAGE step.
 7. BM DAMAGED to generate the CAD model and ABAQUS script for the damaged composite
 8. FEINTERACT DAMAGED to create the damaged composite in ABAQUS/CAE. 
 
@@ -776,7 +749,7 @@ Troubleshooting
 Troubleshooting exceptions when building the model (outside ABAQUS)
 -------------------------------------------------------------------
 If the De-la-mo script raises an exception during model
-assembly, the easiest way to troubleshoot is run the Python
+assembly, the easiest way to troubleshoot is to run the Python
 debugger pdb in post-mortem mode. To do so, its Python
 interpreter will need to be run in interactive mode. If
 using delamo_process, use the "BMINTERACT" command instead of the
@@ -804,7 +777,7 @@ run it in post-mortem mode::
   pdb.pm()
 
 Then you can use commands such as "where" to see the stack trace, "up" and "down" to move levels in the stack, and "print" to display values of variables.
-See `https://docs.python.org/3/library/pdb.html <https://docs.python.org/3/library/pdb.html>`- for more detailed instructions on using the Python debugger. 
+See `https://docs.python.org/3/library/pdb.html <https://docs.python.org/3/library/pdb.html>`_ for more detailed instructions on using the Python debugger.
 
 
 Troubleshooting "should be able to find faces" or "should be able to find edges" AssertionError in ABAQUS
@@ -822,7 +795,7 @@ When this or a similar error occurs, it is generally because a boundary conditio
 The first thing to do is check the popup and the Abaqus log for the
 coordinates being searched for. In this case the coordinates are
 [ -30.0, -24.0, 0.1 ]. Next look for the line number in the generated script
-that triggered the problem, in this case line 3679 of 02_Curved_Single_Delam_ORIGINAL_abq.py (The other location, line 377 in the GetFace() function is of
+that triggered the problem, in this case line 3679 of 01_Curved_Single_Delam_ORIGINAL_abq.py (The other location, line 377 in the GetFace() function is of
 secondary importance. If we look at line 3679 and the comments immediately
 above, we see::
   
@@ -836,7 +809,7 @@ above, we see::
   _codegen_139657270817360=GetFace(_cg_self3_dot_faces,[-30.0,-24.0,0.1,],3.0000000000000004e-05)
 
 The comments above represent a stack trace with the deepest call (inside the De-la-mo API library) last.
-The triggering user code was line 124 of 02_Curved_Single_Delam.py, which attempts to
+The triggering user code was line 124 of 01_Curved_Single_Delam.py, which attempts to
 obtain an instance region based on point coordinates from the first layer ("layer1").
 
 The usual cause of this error is if the specified point does not in fact lie on a surface of the
@@ -881,44 +854,7 @@ About proxy objects
 ===================
 Proxy objects represent ABAQUS objects in the context of the De-La-Mo
 model builder. They record all operations performed on them, so those
-operations can be written to the output ABAQUS script. 
-
-Adding new test cases (C++)
-===========================
-* Create the test case source file in src/testcases/ directory, e.g. __app_stiffener.cpp__
-* The following code segment is a template for the test case source file::
-
-  #include "testcase_includes.h"
-  
-  
-  int main(int argc, char** argv)
-  {
-  	// Read ACIS license file
-  	char* unlock_str = nullptr;
-  	if (!read_license_file("acis_license.txt", unlock_str))
-  	{
-  		std::cout << "ERROR: Unable to read license file!" << std::endl;
-  		pause();
-  		exit(EXIT_FAILURE);
-  	}
-  
-    // PUT YOUR CODE HERE
-
-    // Clear license key from the memory
-  	if (unlock_str != nullptr)
-  	{
-  		delete[] unlock_str;
-  		unlock_str = nullptr;
-  	}
-  
-  	// Pause execution to see console output
-  	pause();
-  
-  	return EXIT_SUCCESS;
-  }
-
-* Insert your C++ test code at the place of the comment // PUT YOUR CODE HERE.
-* Rebuild the CMake project to generate targets for your new test case.
+operations can be written to the output ABAQUS script.
 
 
 Indices and tables

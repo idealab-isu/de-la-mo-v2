@@ -21,7 +21,7 @@ advanced functions for optimizing composite fiber layups based on geodesic paths
 
 ## Quickstart Build Instructions
 1. Acquire requirements listed at http://thermal.cnde.iastate.edu/de-la-mo.xhtml
-2  python setup.py build
+2. python setup.py build
 3. python setup.py install
 
 ## Cloning Instructions
