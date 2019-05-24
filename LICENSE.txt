@@ -1,4 +1,4 @@
-De-La-Mo is Copyright (C) 2016-2018 Iowa State University
+De-La-Mo, AutoFiber, and AutoFiberlib is Copyright (C) 2016-2018 Iowa State University
 Research Foundation, Inc. It is published under the
 Apache 2.0 license, given below. 
 
