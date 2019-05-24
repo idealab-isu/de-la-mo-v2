@@ -17,7 +17,7 @@ Apache 2.0 license. See the LICENSE.txt file for details
 * `examples/`: Contains example python scripts which demonstrate how to use _delamo_
 * `examples/data/`: Contains data files used in the example scripts
 * `autofiberlib/`: Git submodule to the [AutoFiberlib](https://github.com/nscheirer/autofiberlib) repository. Contains
-advanced functions for optimizing composite fiber layups based on geodesic paths and strain energy minimization. (Optional)
+advanced functions for optimizing composite fiber layups based on geodesic paths and strain energy minimization.
 
 ## Quickstart Build Instructions
 1. Acquire requirements listed at http://thermal.cnde.iastate.edu/de-la-mo.xhtml
