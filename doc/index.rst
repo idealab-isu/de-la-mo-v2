@@ -28,6 +28,7 @@ Requirements
 ============
 De-la-mo is designed to work on Windows, Linux, and Macintosh given
 the required dependencies.
+
 * appdirs (Python library for identifying directory)
 * rply (Python parser generator library)
 * baron (Python abstract syntax tree library)
