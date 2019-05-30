@@ -38,6 +38,21 @@ python setup.py build
 python setup.py install
 ```
 
+To include as a dependency in your project consider using git's subtree capabilities. The De-La-Mo project showcases
+this ability and can be seen in the relevant repository. In order to install AutoFiber alongside your project add the
+following to your projects setup.py:
+```python
+package_dir={
+    'autofiber': 'autofiber/autofiber'
+},
+packages=["autofiber"],
+```
+
+This will then allow you to import the AutoFiber class in your project as such:
+```python
+from autofiber.generator import AutoFiber
+```
+
 ## How to run
 Take a look at `test.py` for an in-depth explanation of the relevant
 API calls and how they work for a variety of models.
