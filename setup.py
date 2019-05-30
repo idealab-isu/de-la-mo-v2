@@ -29,7 +29,10 @@ setup(name="delamo",
       author="Adarsh Krisnamurthy, Stephen D. Holland",
       url="http://thermal.cnde.iastate.edu/de-la-mo.xhtml",
       #ext_modules=[],
-      packages=["delamo", "autofiberlib"],
+      package_dir={
+            'autofiber': 'autofiber/autofiber'
+      },
+      packages=["delamo", "autofiber"],
       scripts=["scripts/delamo_process","scripts/delamo_test_processor"],
       #cmdclass = {"build_ext": build_ext_openmp},
 )

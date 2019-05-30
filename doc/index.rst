@@ -431,7 +431,7 @@ axis (which should be normal). The third axis is defined from the cross product:
 Material (i.e. fiber) directions will be specified relative to this coordinate system.
 In the current version of De-la-mo this coordinate system is the same everywhere within
 your De-la-mo model. De-la-mo contains functions that will utilize the fiber layup strategies
-employed by the `autofiber <https://github.com/nscheirer/autofiberlib>`_ library. This library is included in the de-la-mo package but
+employed by the `autofiber <https://github.com/nscheirer/autofiber>`_ python package. This dependency is included in the de-la-mo package but
 specific details on the method and a standalone package can be observed `here <https://github.com/nscheirer/autofiber>`_. De-la-mo
 will operate perfectly well without the AutoFiber library fiber layup methods but the fiber
 orientations defined by the coordsys is regarded as less accurate in certain curved model cases,

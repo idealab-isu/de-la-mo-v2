@@ -44,9 +44,9 @@ from delamo.layer import Layer as OCCLayer
 import delamo
 
 try:
-    from autofiberlib import AutoFiber
+    from autofiber.generator import AutoFiber
 except ImportError:
-    sys.stderr.write("AutoFiberlib not properly installed or missing dependencies. See:\n\nTraceback follows\n---------------------------\n\n")
+    sys.stderr.write("AutoFiber not properly installed or missing dependencies. See:\n\nTraceback follows\n---------------------------\n\n")
     traceback.print_exc()
 
 
