@@ -108,7 +108,7 @@ layer1 = Layer.CreateFromMold(DM,Mold,"OFFSET",thickness,"Layer_1",LaminaSection
 layer1.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25) # meshsize=0.15)
 
 # Once any breaks, etc. of a given layer are complete, it must be
 # finalized. 

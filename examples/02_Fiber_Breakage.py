@@ -181,7 +181,7 @@ layer5 = Layer.CreateFromMold(DM,layer4.gk_layer.OffsetMold(),"OFFSET",thickness
 layer5.Finalize(DM)
 layer5.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-bond_layers(DM,layer4, layer5) 
+bond_layers(DM,layer4, layer5,master_layer=layer4) 
     
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
@@ -196,7 +196,7 @@ layer6 = Layer.CreateFromMold(DM,layer5.gk_layer.OffsetMold(),"OFFSET",thickness
 layer6.Finalize(DM)
 layer6.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-bond_layers(DM,layer5, layer6)
+bond_layers(DM,layer5, layer6,master_layer=layer5)
 
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
@@ -210,7 +210,7 @@ layer7 = Layer.CreateFromMold(DM,layer6.gk_layer.OffsetMold(),"OFFSET",thickness
 layer7.Finalize(DM)
 layer7.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-bond_layers(DM,layer6, layer7)
+bond_layers(DM,layer6, layer7,master_layer=layer6)
 
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
@@ -224,7 +224,7 @@ layer8 = Layer.CreateFromMold(DM,layer7.gk_layer.OffsetMold(),"OFFSET",thickness
 layer8.Finalize(DM)
 layer8.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-bond_layers(DM,layer7, layer8)
+bond_layers(DM,layer7, layer8,master_layer=layer7)
 
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
