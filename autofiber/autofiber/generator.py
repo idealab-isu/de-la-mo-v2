@@ -39,14 +39,20 @@ def calcunitvector(vector):
 
 class AutoFiber:
 
-    def __init__(self, cadfile, initpoint, initdirection, initnormal, angle_error=0.01, **kwargs):
+    def __init__(self, cadfile, initpoint, initdirection, initnormal, materialproperties=(228.0, 0.2, None), fiberint=0.1, angle_error=0.01, accel=False):
         """
         Calculate geodesic based parameterization of a triangular meshed CAD model
         :param cadfile: Path to CAD file (currently supports x3d, stl, and De-La-Mo DMObjects)
         :param initpoint: 3D point closest to the center of the surface we would like to work on
         :param initdirection: 3D unit vector representing the fiber direction at initpoint
         :param initnormal: 3D unit vector indicating the surface normal at initpoint (used to determine which surface to operate on)
-        :param kwargs: options: E (Young's Modulus) = 228, nu (Poisson's ratio) = 0.2, fiberint = 0.1, accel = False
+        :param materialproperties: Composite fiber material properties, if empty then a set of default properties will be used.
+        materialproperties is setup as follows: (E, poisson's ratio, G) if E is a list: for anisotropic [E1, E2, E3],
+        nu is [nu12, nu13, nu23], and the shear modulus G is [G12, G13, G23]. If E is not a list then an isotropic material
+        is used and G will be computed from E and nu.
+        :param fiberint: Perpendicular distance between generated geodesics
+        :param angle_error: Error incorporated into the initdirection, any error defined here is reversed during optimization
+        :param accel: Utilize OpenCL parallel geodesic generator (WIP - not functioning)
         """
         # Get CAD file of part that we would like to parameterize
         self.cadfile = cadfile
@@ -55,7 +61,7 @@ class AutoFiber:
 
         # Gather options, set to default if option doesn't exist
         # accel: activate opencl optimization features (WIP)
-        self.accel = kwargs.get("accel", False)
+        self.accel = accel
 
         # Init spatialnde objects
         self.obj = None
@@ -84,9 +90,9 @@ class AutoFiber:
 
         # Init fiber material properties
         # Defaults are just basic isotropic material properties
-        self.fiberint = kwargs.get("fiberint", 0.1)
-        self.E = kwargs.get("E", 228.0)
-        self.nu = kwargs.get("nu", 0.2)
+        self.fiberint = fiberint
+        self.E = materialproperties[0]
+        self.nu = materialproperties[1]
 
         # Init geodesic variables
         self.startpoints = np.empty((0, 3))
@@ -108,7 +114,7 @@ class AutoFiber:
         # Calculate compliance tensor
         if isinstance(self.E, list):
             # Orthotropic
-            G = kwargs.get("G", None)
+            G = materialproperties[2]
             if G is None:
                 raise ValueError("G property is not defined.")
             self.compliance_tensor = np.array([[1/self.E[0], -self.nu[0]/self.E[1], 0],
@@ -477,10 +483,8 @@ class AutoFiber:
                 shared_cg, _, distance = self.find_close_geodesic([neighbor], sharedvertex)
                 check_dir = np.cross(shared_cg[7] * shared_cg[3], self.facetnormals[element])
                 # Spin off two geodesics in opposite directions that are perpendicular to the closest goedeisc in neighbor
-                distance1, int_pnt_3d1, element1 = self.calc_geodesic(point, element, check_dir, None, None,
-                                                                      parameterization=False, save_ints=False)
-                distance2, int_pnt_3d2, element2 = self.calc_geodesic(point, element, check_dir, None, None, direction=-1,
-                                                                      parameterization=False, save_ints=False)
+                distance1, int_pnt_3d1, element1 = self.calc_geodesic(point, element, check_dir, None, parameterization=False, save_ints=False)
+                distance2, int_pnt_3d2, element2 = self.calc_geodesic(point, element, check_dir, None, direction=-1, parameterization=False, save_ints=False)
 
                 ulist = []
                 flist = []
@@ -539,9 +543,8 @@ class AutoFiber:
 
         shared_cg, element, distance = self.find_close_geodesic(neighbors, vertex)
         check_dir = np.cross(shared_cg[7] * shared_cg[3], self.facetnormals[element])
-        distance1, int_pnt_3d1, element1 = self.calc_geodesic(vertex, element, check_dir, None, None,
-                                                              parameterization=False, save_ints=False)
-        distance2, int_pnt_3d2, element2 = self.calc_geodesic(vertex, element, check_dir, None, None, direction=-1,
+        distance1, int_pnt_3d1, element1 = self.calc_geodesic(vertex, element, check_dir, None, parameterization=False, save_ints=False)
+        distance2, int_pnt_3d2, element2 = self.calc_geodesic(vertex, element, check_dir, None, direction=-1,
                                                               parameterization=False, save_ints=False)
 
         ulist = []
@@ -822,15 +825,22 @@ class AutoFiber:
 
             fig = plt.figure()
             plt.plot(range(len(loss)), loss)
+            plt.title("Loss Function")
+            plt.xlabel("Iteration")
+            plt.ylabel("Loss")
 
             fig = plt.figure()
             plt.scatter(parameterization[:, 0], parameterization[:, 1], c="b")
             plt.scatter(optimizedparamterization[:, 0], optimizedparamterization[:, 1], c="orange")
+            plt.title("Parameterizations")
+            plt.ylabel("V")
+            plt.xlabel("U")
+            plt.legend(["Original", "Optimized"])
 
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
             ax.scatter(self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2])
-            ax.quiver(orientation_locations[:, 0], orientation_locations[:, 1], orientation_locations[:, 2], orientations[:, 0], orientations[:, 1], orientations[:, 2], arrow_length_ratio=0, length=2.0)
+            ax.quiver(orientation_locations[:, 0], orientation_locations[:, 1], orientation_locations[:, 2], orientations[:, 0], orientations[:, 1], orientations[:, 2], arrow_length_ratio=0, length=1.0)
             plt.show()
 
         return texcoords2inplane

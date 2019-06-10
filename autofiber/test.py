@@ -17,6 +17,17 @@ import pickle
 import numpy as np
 from autofiber.generator import AutoFiber as AF
 
+# Define the material properties of the composite fiber material. Since all of the models used here are using mm as
+# as distance units then our material properties must be in GPa in order to get strain energy in J/mm. See
+# optimization.py line 99.
+materialproperties = (
+    # Young's Modulus [E1, E2, E3]
+    [1.415e11/1.e9, 8.5e9/1.e9, 8.5e9/1.e9],
+    # Poisson's ratio [nu12, nu13, nu23]
+    [0.33, 0.33, 0.33],
+    # Shear Modulus [G12, G13, G23]
+    [5.02e9/1.e9, 5.02e9/1.e9, 2.35e9/1.e9])
+
 # angles = [0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]
 angles = [0.0]
 
@@ -31,12 +42,8 @@ for angle in angles:
     #           np.array([-np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), 0]),
     #           # Vector pointing in the primary normal to the surface
     #           np.array([0, 0, 1]),
-    #           # Young's Modulus [E1, E2, E3]
-    #           E=[1.415e11/1.e9, 8.5e9/1.e9, 8.5e9/1.e9],
-    #           # Poisson's ratio [nu12, nu13, nu23]
-    #           nu=[0.33, 0.33, 0.33],
-    #           # Shear Modulus [G12, G13, G23]
-    #           G=[5.02e9/1.e9, 5.02e9/1.e9, 2.35e9/1.e9],
+    #           # Material properties of the composite fiber material
+    #           materialproperties=materialproperties,
     #           # Geodesic spacing interval
     #           fiberint=0.01)
     # Compute an orientation given a fiber angle
@@ -47,9 +54,7 @@ for angle in angles:
     #           np.array([0.0, 0.0, 1.0]),
     #           np.array([np.sin(-1 * np.deg2rad(angle)), np.cos(np.deg2rad(angle)), 0.0]),
     #           np.array([0, 0, 1.0]),
-    #           E=[1.415e11/1.e9, 8.5e9/1.e9, 8.5e9/1.e9],
-    #           nu=[0.33, 0.33, 0.33],
-    #           G=[5.02e9/1.e9, 5.02e9/1.e9, 2.35e9/1.e9],
+    #           materialproperties=materialproperties,
     #           fiberint=0.05)
     # texcoords2inplane = test.layup(0.0, plotting=True)
 
@@ -58,9 +63,7 @@ for angle in angles:
               np.array([0.0, 1.0, 0.0]),
               np.array([-np.cos(np.deg2rad(angle)), 0, -np.sin(np.deg2rad(angle))]),
               np.array([0, 1, 0]),
-              E=[1.415e11/1.e9, 8.5e9/1.e9, 8.5e9/1.e9],
-              nu=[0.33, 0.33, 0.33],
-              G=[5.02e9/1.e9, 5.02e9/1.e9, 2.35e9/1.e9],
+              materialproperties=materialproperties,
               fiberint=0.01,
               # Further angle to be applied to the given fiber direction
               #  This is typically used as a tolerance in the fiber angle but
@@ -75,9 +78,7 @@ for angle in angles:
     #           np.array([0.0, 0.0, 3.0]),
     #           np.array([np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), 0.0]),
     #           np.array([0, 0, 1]),
-    #           E=[1.415e11/1.e9, 8.5e9/1.e9, 8.5e9/1.e9],        # GPa
-    #           nu=[0.33, 0.33, 0.33],
-    #           G=[5.02e9/1.e9, 5.02e9/1.e9, 2.35e9/1.e9],        # GPa
+    #           materialproperties=materialproperties,
     #           fiberint=0.25)
     # Can define mesh coordinates at which the orientation can be computed
     # meshcoords = np.load("demos/curved_abaqus_mesh_coords.npy")

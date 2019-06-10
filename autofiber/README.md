@@ -54,8 +54,11 @@ from autofiber.generator import AutoFiber
 ```
 
 ## How to run
-Take a look at `test.py` for an in-depth explanation of the relevant
+Take a look at [test.py](test.py) for an in-depth explanation of the relevant
 API calls and how they work for a variety of models.
+
+## Tutorial
+A short tutorial with explanations of API and images of results is located [here](doc/tutorial.md).
 
 ## Abaqus integration
 A function has been created and implemented in De-La-Mo to allow for
