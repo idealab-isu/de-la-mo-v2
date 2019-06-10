@@ -1164,10 +1164,12 @@ layup direction, etc."""
          element centroid. """
         self.orientation = AutoFiber(self.gk_layer.DMObj,
                                      point, fibervec, normal,
-                                     E=[mp[0], mp[1], mp[3]],
-                                     nu=[mp[3], mp[4], mp[5]],
-                                     G=[mp[6], mp[7], mp[8]],
-                                     fiberint=fiberint, angle_error=angle_error)
+                                     materialproperties=(
+                                         [mp[0], mp[1], mp[2]],
+                                         [mp[3], mp[4], mp[5]],
+                                         [mp[6], mp[7], mp[8]]),
+                                     fiberint=fiberint,
+                                     angle_error=angle_error)
 
         self.LayupFiberObject(DM, self.layupdirection, final_plotting=final_plotting)
 
