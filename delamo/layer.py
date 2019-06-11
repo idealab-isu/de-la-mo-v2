@@ -194,9 +194,10 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
             currentUV = SAS.ValueOfUV(currentCP, OrigPointTolerance)
             ClosestU = currentUV.X()
             ClosestV = currentUV.Y()
+            [uMin, uMax, vMin, vMax] = SAS.Bounds()
 
             angleIncrement = 1
-            parIncrement = 0.01
+            parIncrement = 0.1 * (math.sqrt((uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin))/math.sqrt(2.00))
             pointFound = False
             for angle in range(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)

@@ -358,7 +358,7 @@ class OCCModelBuilder(object):
         self.NormalTolerance=1e-6
         self.Debug=False
         self.NextUnique=0
-        self.GapWidth=0.3 # default gap of 0.3 mm
+        self.GapWidth=0.5 # default gap of 0.5 mm
         self.STLMeshSize=3.0
         
         for argname in kwargs:
@@ -680,14 +680,14 @@ class OCCModelBuilder(object):
             # sys.modules["__main__"].__dict__.update(locals())
             # raise ValueError("Break")
 
-            if False:
+            if True:
                 # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
                 NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
 
                 # Create reference parametric face for the no model zone using the NoModelWireShape
                 RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, self.PointTolerance)
-
-            RefNoModelParamFace = None
+            else:
+                RefNoModelParamFace = None
 
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
             ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
@@ -747,9 +747,9 @@ class OCCModelBuilder(object):
                 if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
                     # Matched! ... This particular split_face is a delamination zone.
                     # Need to do another split... but for now let's just call it
-                    BCTypes[0]="CONTACT"
+                    #BCTypes[0]="CONTACT"
                     
-                    if False:
+                    if True:
                     
                         # Use NoModelToolShape to do the split, operate on split_faces[0]
                         NoModelSplitter=GEOMAlgo_Splitter()
