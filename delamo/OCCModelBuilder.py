@@ -2,6 +2,8 @@ import sys
 import copy
 import os.path
 import csv
+import numpy as np
+
 from OCC.TopoDS import topods
 
 from OCC.TopoDS import TopoDS_Face
@@ -14,6 +16,7 @@ from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
 from OCC.TopoDS import topods_Edge
 from OCC.TopoDS import topods_Wire
+from OCC.GC import GC_MakeSegment
 from OCC.BRep import BRep_Builder
 from OCC.BRep import BRep_Tool
 from OCC.BRepExtrema import BRepExtrema_DistShapeShape
@@ -32,6 +35,7 @@ from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
 from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
 from OCC.BRepTools import breptools_Read
+from OCC.BRepTools import breptools_Write
 from OCC.TopExp import TopExp_Explorer
 from OCC.TopAbs import TopAbs_ON
 from OCC.TopAbs import TopAbs_IN
@@ -779,6 +783,20 @@ class OCCModelBuilder(object):
                             (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
                         
                             split_faces.append(nomodel_split_face_shape)
+
+                            # Debugging only
+                            #nmsp_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(NoModel_Split_Point[0],NoModel_Split_Point[1],NoModel_Split_Point[2])).Vertex()
+                            end_point = np.concatenate((NoModel_Split_ParPoint,(0,))) + np.array((0,0,1))*0.1
+                            nmsp_line = GC_MakeSegment(gp_Pnt(NoModel_Split_ParPoint[0],NoModel_Split_ParPoint[1],0.0),gp_Pnt(end_point[0],end_point[1],end_point[2])).Value()
+                            nmsp_edge = BRepBuilderAPI_MakeEdge(nmsp_line)
+                            nmsp_edge.Build()
+                            print("Saving breps!")
+                            
+                            #breptools_Write(nmsp_vertex,"/tmp/point.brep")
+                            breptools_Write(nmsp_edge.Shape(),"/tmp/line%d.brep" % (len(BCTypes)))
+                            breptools_Write(NoModelRefParamFace,"/tmp/face%d.brep" % (len(BCTypes)))
+                            
+                            # end debugging
                             
                             
                             if (layer.OCCPointInFace((NoModel_Split_ParPoint[0],NoModel_Split_ParPoint[1],0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
@@ -789,6 +807,7 @@ class OCCModelBuilder(object):
                             else:
                                 BCTypes.append("NONE")
                                 pass
+                            
                             
                             NoModel_split_exp.Next()
                             pass
