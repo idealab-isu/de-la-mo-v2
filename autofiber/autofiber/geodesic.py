@@ -59,6 +59,7 @@ def vector_inbetween(v1, v2, v3, error=1e-10):
     """
     Determines if a vector (v1) is between v2 and v3
     https://stackoverflow.com/questions/13640931/how-to-determine-if-a-vector-is-between-two-other-vectors
+
     :param v1: Test vector
     :param v2: Given vector
     :param v3: Given vector
@@ -96,6 +97,7 @@ def rot_vector_angle(vector, normal, angle):
 def check_proj_inplane_pnt(point, element_vertices):
     """
     https://math.stackexchange.com/questions/544946/determine-if-projection-of-3d-point-onto-plane-is-within-a-triangle
+
     :param point: Test point to check
     :param element_vertices: Vertices of current element
     :return: True or False, depending on if the projected point is inside or outside
@@ -119,6 +121,7 @@ def check_proj_inplane_pnt(point, element_vertices):
 def proj_vector(vector, newnormal):
     """
     Project a vector onto a surface defined by newnormal
+
     :param vector: Vector to be projected
     :param newnormal: Normal of projected surface
     :return: Vector projected on surface defined by newnormal
@@ -189,6 +192,7 @@ def find_edge(point, direction, bary, error):
     """
     Determines which edge number is intersected first (0, 1, 2) -> (d12, d23, d31)
     https://math.stackexchange.com/questions/2292895/walking-on-the-surface-of-a-triangular-mesh
+
     :param point: Start point
     :param direction: Current fiber direction
     :param error: Numerical tolerance
@@ -230,6 +234,7 @@ def find_edge(point, direction, bary, error):
 def find_neighbors(element, vertexids_indices, adjacencyidx):
     """
     Finds neighboring elements
+
     :param element: Current element
     :param vertexids_indices: Indices of the mesh indices
     :param adjacencyidx: Built from spatialnde, index of element adjacency
@@ -254,6 +259,7 @@ def find_neighbors(element, vertexids_indices, adjacencyidx):
 def calcdistance(unitvector, oldvertex, meshpoints):
     """
     Calculate perpendicular distance between a ray and a point
+
     :param unitvector: Reference vector to calculate distance from
     :param oldvertex: Start point for unitvector
     :param meshpoints: Test points
@@ -267,6 +273,7 @@ def calcdistance(unitvector, oldvertex, meshpoints):
 def calcclosestpoint(unitvector, oldpoint, meshpoints, normal):
     """
     Find closest mesh vertex defined by the distances calculated in calcdistance
+
     :param unitvector: Reference direction vector
     :param oldpoint: Start point for unitvector
     :param meshpoints: All test points
@@ -293,6 +300,7 @@ def calcbarycentric(point, element_vertices):
     Convert 3d point to barycenteric coordinates
     https://en.wikipedia.org/wiki/Barycentric_coordinate_system
     https://math.stackexchange.com/questions/2292895/walking-on-the-surface-of-a-triangular-mesh
+
     :param point: 3d point
     :param element_vertices: Vertices of current element
     :return: point in barycenteric coordinates
@@ -328,6 +336,7 @@ def invcalcbarycentric(pointuv, element_vertices):
     Convert barycenteric coordinates into 3d
     https://en.wikipedia.org/wiki/Barycentric_coordinate_system
     https://math.stackexchange.com/questions/2292895/walking-on-the-surface-of-a-triangular-mesh
+
     :param pointuv: Point in barycenteric coordinates (u, v)
     :param element_vertices: Vertices of current element
     :return: pointuv in 3d coordinates (x, y, z)
@@ -340,6 +349,7 @@ def calcbarycentricdirection(vector, element_vertices):
     Convert a direction vector from 3d to barycenteric coordinates
     https://en.wikipedia.org/wiki/Barycentric_coordinate_system
     https://math.stackexchange.com/questions/2292895/walking-on-the-surface-of-a-triangular-mesh
+
     :param vector: Direction vector in 3d
     :param element_vertices: Vertices of current element
     :return: Vector in barycenteric coordinates (du, dv)
@@ -375,6 +385,7 @@ def invcalcbarycentricdirection(vectoruv, element_vertices):
     Convert vector in barycenteric coordinates into a 3d vector
     https://en.wikipedia.org/wiki/Barycentric_coordinate_system
     https://math.stackexchange.com/questions/2292895/walking-on-the-surface-of-a-triangular-mesh
+
     :param vectoruv: Vector in barycenteric coordinate (du, dv)
     :param element_vertices: Vertices of current element
     :return: Vectoruv in 3d space (dx, dy, dz)
@@ -386,6 +397,7 @@ def invcalcbarycentricdirection(vectoruv, element_vertices):
 def check_inplane_pnt(point, element_vertices):
     """
     Determines if a point is within the plane of the current element face
+
     :param point: A point within or on the edge of the current element
     :param element_vertices: Vertices of current element
     :return: True if the point is within in the plane, or False if otherwise
@@ -403,6 +415,7 @@ def check_inplane_pnt(point, element_vertices):
 def check_inplane_vector(vector, normal):
     """
     Determines if a vector is in plane with the current element
+
     :param vector: Test vector
     :param normal: Normal of element
     :return:
@@ -418,6 +431,7 @@ def check_inplane_vector(vector, normal):
 def find_element_vertex(point, unitvector, curnormal, vertices, vertexids, facetnormals):
     """
     Determines which element is next given a vertex and an angle
+
     :param point: Vertex in the mesh
     :param unitvector: Fiber direction vector
     :param curnormal: Current element normal direction vector
@@ -452,6 +466,7 @@ def find_element_vertex(point, unitvector, curnormal, vertices, vertexids, facet
 def find_element_within(point, unitvector, normal, vertices, vertexids, facetnormals, inplanemat):
     """
     Determines which element a point is within
+
     :param point: Vertex in the mesh
     :param unitvector: Fiber direction vector
     :param normal: Current element normal direction vector
@@ -491,6 +506,7 @@ def find_element_within(point, unitvector, normal, vertices, vertexids, facetnor
 def traverse_element(af, element, point, unitfiberdirection, length, uv_start, direction=1, parameterization=True):
     """
     Traverse a triangular element
+
     :param af: Autofiber object
     :param element: Current triangular element
     :param point: Current point

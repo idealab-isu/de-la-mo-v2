@@ -1,3 +1,4 @@
+# - * - coding: utf - 8 - * -
 # Copyright 2016-2018 Iowa State University Research Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +26,7 @@ def calcunitvector(vector):
 def calc2d(obj, points):
     """
     Calculate a 2D representation of a 3D model
+
     :param obj: spatialnde object
     :param points: 3D model points to be converted to 2D
     :return: points in 2D space
@@ -39,6 +41,7 @@ def minor(arr, i, j):
     """
     https://stackoverflow.com/questions/3858213/numpy-routine-for-computing-matrix-minors
     Calculate the minor of a matrix with ith row, jth column removed
+
     :param arr: Matrix of interest
     :param i: row to remove
     :param j: column to remove
@@ -53,6 +56,7 @@ def build_checkerboard(w, h):
     """
     https://stackoverflow.com/questions/2169478/how-to-make-a-checkerboard-in-numpy
     Build a checkerboard array
+
     :param w: width of checkerboard
     :param h: height of checkerboard
     :return: checkerboard array of width w and height h
@@ -63,8 +67,37 @@ def build_checkerboard(w, h):
 
 
 def computeglobalstrain(normalized_2d, fiberpoints, vertexids, stiffness_tensor):
-    """
-    Compute the strain energy between a 2d representation of a surface and a uv parameterization
+    r"""
+    Compute the strain energy between a 2d representation of a surface and a uv (geodesic) parameterization
+
+    :math:`p_{3D}` - 2D mapping of 3D model surface based on element normal and inplanemat
+
+    :math:`p_{UV}` - Parameterization of 3D surface based on geodesic lines
+
+    Compute the areas of each triangular element in UV space:
+
+    :math:`A_{uv} = \frac{1}{2}det(p_{uv})`
+
+    Compute the deformation gradient between each element in UV space and the corresponding element in 2D space:
+
+    :math:`F = p_{3D} * p_{UV}^{-1}`
+
+    Utilizing the Lagrangian finite strain tensor:
+
+    :math:`\epsilon = \frac{1}{2}(C - I)`
+
+    where :math:`C = F^{t}F` the right Cauchy–Green deformation tensor and :math:`I` is the identity matrix.
+
+    Since :math:`\overrightarrow{\epsilon} = [\epsilon_{11}, \epsilon_{22}, 2\gamma_{12}]` we have to:
+
+    :math:`\overrightarrow{\epsilon} = \frac{\epsilon}{[1.0, 1.0, 0.5]}^T`
+
+    Therefore the total strain energy density of the surface with units (J/length):
+
+    :math:`E_{total} = \sum_{k=0}^N\frac{1}{2}\overrightarrow{\epsilon_k}^2SA_{uv_k}`
+
+    where :math:`S` is the stiffness tensor of the defined material and N is the total number of mesh elements.
+
     :param normalized_2d: 2D representation of a 3D model
     :param fiberpoints: uv parameterization
     :param vertexids: Vertex indices of each element in the 3D model
@@ -103,7 +136,7 @@ def computeglobalstrain(normalized_2d, fiberpoints, vertexids, stiffness_tensor)
     return total_strain_energy
 
 
-# Create a helper matrix now to help out later
+# Create a helper matrix now to use later
 duvw_duij_t = np.zeros((6, 3, 3))
 for j in range(0, 3):
     for i in range(0, 2):
@@ -111,9 +144,71 @@ for j in range(0, 3):
 
 
 def computeglobalstrain_grad(normalized_2d, fiberpoints, vertexids, stiffness_tensor, oc):
-    """
+    r"""
     Compute the gradient of the strain energy function defined above with respect to the movement of each point in the
     uv parameterization.
+
+    :math:`p_{3D}` - 2D mapping of 3D model surface based on element normal and inplanemat
+
+    :math:`p_{UV}` - Parameterization of 3D surface based on geodesic lines
+
+    Compute the areas of each triangular element in UV space:
+
+    :math:`A_{uv} = \frac{1}{2}det(p_{uv})`
+
+    In order to calculate the derivative of the area of each element with respect to each nodal displacement we will
+    calculate the (i,j)-minor of :math:`A_{uv}` by the determinate of the matrix created by removing the ith row and jth
+    column in :math:`p_{uv}` for each element in :math:`p_{uv}`:
+
+    :math:`M_{ij} = det(minor(p_{uv_{ij}}))`
+
+    Then using :math:`M_{ij}` we can compute the cofactor matrix:
+
+    :math:`Cof = ((-1)^{i+j}M_{ij})_{1 \leq i,j \leq n^*}`
+
+    Therefore, the adjugate matrix of :math:`A_{uv}` is:
+
+    :math:`adj(A_{uv}) = Cof^T`
+
+    The derivative of the area of each element with respect to each nodal displacement can be calculated using
+    Jacobi's formula as follows:
+
+    :math:`\frac{dA_{uv}}{dp_{uv}} = -\frac{1}{2}trace(adj(A_{uv})*\frac{dp_{uv}}{dp_{uv_{ij}}})`
+
+    where :math:`\frac{dp_{uv}}{dp_{uv_{ij}}}` is the derivative of each nodal displacement with respect to moving all
+    the other nodes for each mesh element.
+
+    Compute the deformation gradient between each element in UV space and the corresponding element in 2D space:
+
+    :math:`F = p_{3D} * p_{UV}^{-1}`
+
+    Utilizing the Lagrangian finite strain tensor:
+
+    :math:`\epsilon = \frac{1}{2}(C - I)`
+
+    where :math:`C = F^{t}F` the right Cauchy–Green deformation tensor and :math:`I` is the identity matrix.
+
+    Since :math:`\overrightarrow{\epsilon} = [\epsilon_{11}, \epsilon_{22}, \gamma_{12}/2]` we have to:
+
+    :math:`\overrightarrow{\epsilon} = \frac{\epsilon}{[1.0, 1.0, 0.5]}^T`
+
+    The derivative of the deformation tensor with respect to each nodal displacement is as follows:
+
+    :math:`\frac{dF}{dp_{uv}} = p_{uv}^{-1}\frac{dp_{uv}}{dp_{uv_{ij}}}p_{uv}^{-1}p_{3D}`
+
+    The derivative of strain with respect to each nodal displacement:
+
+    :math:`\frac{d\epsilon}{dp_{uv}} = \frac{1}{2}(\frac{dF}{dp_{uv}}^TF + F^T\frac{dF}{dp_{uv}})`
+
+    Then to account for :math:`2\gamma_{12}`:
+
+    :math:`\frac{d\overrightarrow{\epsilon}}{dp_{uv}} = \frac{\frac{d\epsilon}{dp_{uv}}}{[1.0, 1.0, 0.5]}`
+
+    Finally, we can compute the derivative of the strain energy density with respect to each nodal displacement with the
+    following application of the chain rule:
+
+    :math:`\frac{dE}{dp_{uv}} = \overrightarrow{\epsilon}S\frac{d\overrightarrow{\epsilon}}{dp_{uv}}A_{uv} + \frac{1}{2}\overrightarrow{\epsilon}S\overrightarrow{\epsilon}\frac{dA_{uv}}{dp_{uv}}`
+
     :param normalized_2d: 2D representation of a 3D model
     :param fiberpoints: uv parameterization
     :param vertexids: Vertex indices of each element in the 3D model

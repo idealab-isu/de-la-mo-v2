@@ -67,9 +67,9 @@ def IdentifyTexMaps(part,surfaceparameterizationmapping=None):
             surfaceparameterization=surfaceparameterizationmapping[id(surface)]
             pass
         
-        if isinstance(surfaceparameterization,polygonalsurface_texcoordparameterization): # only support texture coordinates
+        if isinstance(surfaceparameterization,polygonalsurface_texcoordparameterization): # only extras texture coordinates
             
-            # Currently only support texture url
+            # Currently only extras texture url
             if surface.appearance is not None and hasattr(surface.appearance,"texture_url"):
                 surface_texurl[id(surface)]=surface.appearance.texture_url
                 pass
@@ -89,7 +89,7 @@ def IdentifyTexMaps(part,surfaceparameterizationmapping=None):
 
 
 def BuildEdgeDict(surface):
-    """ build edge dictionary from a surface. 
+    """ Create edge dictionary from a surface.
     The edge dictionary is indexed by a tuple 
     (vertexindex1,vertexindex2) of indices into surface.vertexes. 
     It contains a list of polygon ids that have an edge that shares

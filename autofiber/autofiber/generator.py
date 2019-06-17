@@ -42,6 +42,7 @@ class AutoFiber:
     def __init__(self, cadfile, initpoint, initdirection, initnormal, materialproperties=(228.0, 0.2, None), fiberint=0.1, angle_error=0.01, accel=False):
         """
         Calculate geodesic based parameterization of a triangular meshed CAD model
+
         :param cadfile: Path to CAD file (currently supports x3d, stl, and De-La-Mo DMObjects)
         :param initpoint: 3D point closest to the center of the surface we would like to work on
         :param initdirection: 3D unit vector representing the fiber direction at initpoint
@@ -210,6 +211,7 @@ class AutoFiber:
     def find_close_geodesic(self, elements, point):
         """
         Find the closest geodesic in self.georecord and elements
+
         :param elements: A given set of search elements for a close geodesic
         :param point: The point we want to find a close geodesic to
         :return: tuple(georecord, element closest geodesic is in,
@@ -233,6 +235,7 @@ class AutoFiber:
         """
         Determine which surface of a 3D model we should operate on.
         This should single out a solo surface without sharp (90 degree) edges
+
         :param initpoint: Starting point
         :param initdirection: Starting direction
         :return: Sets self.surface_vertexids
@@ -261,6 +264,7 @@ class AutoFiber:
         Determines starting location, direction, and element for each geodesic
         Spawns geodesics perpendicular to initdirection
         Geodesic start points are dropped in self.fiberint intervals
+
         :param initpoint: Starting location (should be close to the center of the model)
         :param initdirection: Starting direction vector
         :param normal: Surface normal vector
@@ -385,6 +389,7 @@ class AutoFiber:
         """
         Computes the a geodesic path in the positive and negative direction for each point define in start_points beginning
         at the index startidx
+        :param: startidx: Which index in self.startpoints to begin calculating geodesics at
         :return: Adds the relevant details for each geodesic to self.georecord
         """
         for i in range(startidx, self.startpoints.shape[0]):
@@ -400,6 +405,7 @@ class AutoFiber:
     def calc_geodesic(self, point, element, unitfiberdirection, uv_start, direction=1, parameterization=False, save_ints=True):
         """
         Calculates the geodesic path from a point in a given direction
+
         :param point: The geodesic's starting point
         :param element: The first element we will traverse
         :param unitfiberdirection: The desired direction the geodesic will propogate
@@ -449,6 +455,7 @@ class AutoFiber:
     def check_negative_area(self, record):
         """
         Check to see if we have a triangle with a flipped normal
+
         :param record: Parameterization we want to check
         :return: True if there is a flipped triangle, False otherwise
         """
@@ -463,6 +470,7 @@ class AutoFiber:
     def interpolate_geodesic(self, point, element, minassigned):
         """
         Determine a geodesics starting direction and uv parameterization location that is between two other geodesics
+
         :param point: A point between two geodesics
         :param element: The element point is within or a vertex of
         :param minassigned: Minimum number of neighbor elements that have geodesics within them for the used starting element
@@ -532,6 +540,7 @@ class AutoFiber:
         """
         Determine the uv coordinates of a point using the same method as interpolate_geodesic
         (Currently not being used as direct assignment is faster and more accurate than spinning off more geodesics)
+
         :param vertex: Starting vertex
         :return: uv coordinates of vertex
         """
@@ -582,6 +591,7 @@ class AutoFiber:
     def fill_missing_geodesics(self, elements, minassigned):
         """
         Spin off more geodesics in elements that contain no geodesics (i.e. fill holes in the initially spawned geodesics)
+
         :param elements: Elements without an geodesics
         :param minassigned: Minimum number of neighbors that contain geodesics
         :return: Nothing
@@ -606,6 +616,7 @@ class AutoFiber:
         """
         Spin off more geodesics in elements that contain a low number of geodesics per area
         (This method is a little unreliable because the geodesics/area threshold isn't well defined for all models)
+
         :param minassigned: Minimum number of neighbors that contain geodesics
         :return: Nothing
         """
@@ -632,7 +643,7 @@ class AutoFiber:
         """
         Assign all vertices a uv coordinate based on the closest geodesic to the vertex
         Cleanup methods are employed here such as self.fill_missing_geodesics and self.fill_low_density_geodesics
-        :param cleanup: Method of cleanup we will employ if needed
+
         :return: Sets the self.geoparameterization
         """
         mask = np.ones((self.geoparameterization.shape[0]), dtype=bool)
@@ -667,7 +678,6 @@ class AutoFiber:
         Create the uv parameterization based on the computed geodesic paths
         If vertices can't be assigned or are missed cleanup methods are employed to attempt to solve coordinates for all
         vertices. This is difficult to make robust as geometric complexities can vary quite largely.
-        :return:
         """
         mask = np.ones((self.geoparameterization.shape[0]), dtype=bool)
         mask[np.unique(self.surface_vertexids)] = False
@@ -702,6 +712,7 @@ class AutoFiber:
     def interpolate(self, leftover_idxs, mask):
         """
         Basic interpolation of uv coordinates based on nearby element fiber directions leftover from geodesic paths
+
         :param leftover_idxs: Indices of missed vertices during assignment
         :param mask: Surface vertex index mask
         :return: Any vertex indices that were missed by this cleanup method
@@ -743,6 +754,7 @@ class AutoFiber:
         """
         Last ditch effort to assign the missed vertices. Simply average any nearby uv coordinates and make sure the new
         coordinate won't flip the triangle.
+
         :param leftover_idxs: Indices of missed vertices during assignment
         :param mask: Surface vertex index mask
         :return: Any vertex indices that were missed by this cleanup method
@@ -772,6 +784,7 @@ class AutoFiber:
         """
         Once the parameterization has been computed we can calculate any fiber orientation without needing to compute a new geodesic
         mapping. Simply rotate the geoparameterization by angle and then minimize the strain energy.
+
         :param angle: Desired fiber orientation
         :param orientation_locations: Optional locations to calculate the fiber orientations at. Default is element centroids.
         :param precision: Termination threshold for the strain energy optimization
@@ -827,7 +840,7 @@ class AutoFiber:
             plt.plot(range(len(loss)), loss)
             plt.title("Loss Function")
             plt.xlabel("Iteration")
-            plt.ylabel("Loss")
+            plt.ylabel("Energy (J/length)")
 
             fig = plt.figure()
             plt.scatter(parameterization[:, 0], parameterization[:, 1], c="b")
@@ -848,6 +861,7 @@ class AutoFiber:
     def fiberoptimize(self, seed, precision=None, maxsteps=None, lr=None, decay=None, eps=None, mu=None):
         """
         Minimum strain energy optimization of a seed parameterization. Uses an RMSprop optimization algorithm.
+
         :param seed: Initial uv parameterization
         :param precision: Termination threshold for the strain energy optimization
         :param maxsteps: Maximum number of optimizaiton iterations
@@ -884,6 +898,7 @@ class AutoFiber:
     def calctransform(self, parameterization):
         """
         Calculate the transformation matrix between the 3D model and the uv parameterization using spatialNDE
+
         :param parameterization: uv parameterization
         :return: Transformation matrix
         """
@@ -920,6 +935,7 @@ class AutoFiber:
     def calcorientations_abaqus(self, modellocs, vertices, vertexids, inplanemat, texcoords2inplane, boxes, boxpolys, boxcoords):
         """
         Function optimized for Abaqus to determine the orientations of given locations.
+
         :param modellocs: Points of interest on the surface or close to the surface
         :param vertices: Vertices of the model
         :param vertexids: Indices of the vertices of the model for each element

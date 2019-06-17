@@ -1,5 +1,5 @@
 # Tutorial
-This tutorial will follow one of the examples in [test.py](../test.py), specifically the optimization of fiber orientations on the 
+This tutorial will follow one of the examples in [test.py](../test.py), specifically the optimization of fiber orientations on the
 saddle model. To run `test.py` simply run `python test.py` or launch `test.py` with `python launcher.py` which will launch
 the `test.py` file in an IPython interactive shell with pylab already primed to be initialized.
 
@@ -9,7 +9,7 @@ from autofiber.generator import AutoFiber as AF
 ```
 
 In `test.py` the experiments are setup such that a variety of angles can be computed sequentially. To create an AutoFiber
-object we can use the following call.
+object we can use the following call:
 ```python
 # Saddle model - X3D - Anisotropic material properties
 test = AF('demos/SmallSaddle32.x3d',
@@ -43,21 +43,21 @@ Therefore, if we have the following model:
 
 ![alt text](images/saddlemodel.png "CAD model of saddle")
 
-We can pick the point which will be in approximately the center. The Autofiber package will determine the nearest vertex
-to start from so we don't have to be extremely precise. It is not necessary to pick a start point in the center of the model,
-however starting from this location will give us the greatest opportunity to cover the entire surface with geodesics.
+we can pick the point which will be in approximately the center. The Autofiber package will determine the nearest vertex
+to start from so we don't have to be extremely precise. It is not necessary to pick a start point at the center of the model,
+however starting from this location will give us the greatest opportunity to cover the entire surface with geodesic lines.
 
 ![alt text](images/saddlemodelwithstart.png "CAD model of saddle with start point")
 
 Now, we need to figure out the direction of the geodesics we would like to use. Typically, if we consider a plane that goes
-through the start point we picked that shares the same general surface normal as our model then we can determine a good
+through the start point that shares the same general surface normal as our model then we can determine a good
 starting geodesic direction. Keep in mind that this direction will essentially set our U-V directions or in terms of
-composite fibers the U direction is the longitudinal direction and V is the transverse direction. Therefore, more than not
+composite fibers the U direction is the longitudinal direction and V is the transverse direction. Therefore, more than not,
 we will use an initial geodesic direction in a principle direction i.e. [1, 0, 0] as seen here:
 
 ![alt text](images/saddlemodelwithdirection.png "CAD model of saddle with direction vector")
 
-Occasionally, the algorithm will completely fail to create a parameterization and an error like the following might occur:
+Occasionally, the algorithm will fail to assign all the vertices a UV coordinate and an error like the following might occur:
 ```python
 Traceback (most recent call last):
   File "test.py", line 73, in <module>
@@ -76,18 +76,18 @@ depicted in the following image:
 ![alt text](images/saddlemodelwitherror.png "CAD model of saddle with starting angle error")
 
 Any error we create with the `angle_error` parameter will be reversed when we optimize the parameterization. For example,
-when using the saddle model if we use an `angle_error=0.1`, which means we are basically using the define geodesic direction,
-we will receive the above error. This is because the saddle and it's doubly curved nature makes it difficult to parameterize
+when using the saddle model, if we use an `angle_error=0.1`, which means we are basically using the defined geodesic direction,
+we will fail to assign all vertices. This is because the saddle and it's doubly curved nature makes it difficult to parameterize
 the full surface. However, if we use an `angle_error=45.0` we can see that a full parameterization can be made. In most cases
 this error should be ~0.1 or something close to zero (it's not recomended to use zero because geodesics can't be accurately
 determined along mesh lines).
 
 Once the geodesic direction vector has been determined and an appropriate `angle_error` applied then the surface normal,
-typically that normal we used for the plane the geodesic direction vector is defined within can be calculated, usually
+typically that normal we used for the plane of the geodesic direction vector can be calculated, usually
 by just taking the cross product of the longitudinal and transverse directions. This is also the vector which the initial
 geodesic direction vector will be rotated upon when the `angle_error` is applied.
 
-If we have properly defined the AutoFiber object a parameterization will be created and the following output will be observed:
+If we have properly defined the AutoFiber object, a parameterization will be created and the following output will be observed:
 ```python
 Angle: 0.0
 x3d_indexedfaceset_loader:  Non-implemented tag NavigationInfo
@@ -122,11 +122,12 @@ Initial strain energy: 111.22885079385848 J/(model length)
 Residual: 4.048914335186282e-05       
 Time to optimize: 14.077847 seconds
 ```
+
 we can use this transformation to find out the fiber orientation at any point on our model. The Abaqus optimized
-function included in the Autofiber package can be used to perform this operation. This function was designed to be used
-within the Abaqus context but works perfectly well on its own as well. The saddle demo does not come with any predefined
-list of interesting points we would like to look at so the default will be used, which is the centroids of each triangular
-element. Since we set `plotting=True` in this case the fiber orientations at each element centroid was calculated and
+function included in the Autofiber class can be used to perform this operation. This function was designed to be used
+within the Abaqus context but works perfectly well on its own. The saddle demo does not come with any predefined
+list of interesting points so the default will be used, which is the centroids of each triangular
+element. Since we set `plotting=True` the fiber orientations at each element centroid were calculated and
 can be observed in the following image:
 
 ![alt text](images/saddlemodelorientations.png "Saddle model with fiber orientations at each element centroid")

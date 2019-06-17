@@ -7,13 +7,14 @@ State University.
 
 AutoFiber is Copyright (C) 2016-2018 Iowa State University
 Research Foundation, Inc. It is published under the
-Apache 2.0 license. See the LICENSE file for details.
+Apache 2.0 license. See the [LICENSE](LICENSE) file for details.
 
 ## Project Structure
 * `autofiber/`: Contains the python package __autofiber__.
 * `demos/`: Contains a variety of demo models and a script, *test.py*
 which demonstrates usage on each model.
-* `doc/`: Contains various documentation materials
+* `docs/`: Contains various documentation materials. Complete documentation
+can be obtained [here](https://nscheirer.github.io/autofiber/).
 
 ## Package Structure
 * `generator.py`: Main control script which generates geodesic start points, calculates geodesic paths, computes the
@@ -58,7 +59,7 @@ Take a look at [test.py](test.py) for an in-depth explanation of the relevant
 API calls and how they work for a variety of models.
 
 ## Tutorial
-A short tutorial with explanations of API and images of results is located [here](doc/tutorial.md).
+A short tutorial with explanations of API and images of results is located [here](docs/tutorial.md).
 
 ## Abaqus integration
 A function has been created and implemented in De-La-Mo to allow for
