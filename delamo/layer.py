@@ -425,7 +425,7 @@ class DMObject:
                         refined = True
 
                         if numTrianglesAdded % 100 == 0:
-                            print ".",
+                            print(".", end=" ")
                     else:
                         newMaxEdgeLen = maxEdgeLen
 
