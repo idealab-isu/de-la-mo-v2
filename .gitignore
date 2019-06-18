@@ -174,5 +174,8 @@ $RECYCLE.BIN/
 # Doxygen output directory
 docs/
 
+# Sphinx output directory
+_build/
+
 # License file(s)
 examples/license.dat

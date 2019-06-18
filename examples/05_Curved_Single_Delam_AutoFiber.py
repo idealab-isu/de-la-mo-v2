@@ -1,3 +1,17 @@
+# Copyright 2016-2018 Iowa State University Research Foundation, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import numpy as np
 
 from delamo.api import DelamoModeler 
@@ -108,7 +122,7 @@ layer1 = Layer.CreateFromMold(DM,Mold,"OFFSET",thickness,"Layer_1",LaminaSection
 layer1.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25) # meshsize=0.15)
+                         fiberint=0.25)
 
 # Once any breaks, etc. of a given layer are complete, it must be
 # finalized. 
@@ -144,7 +158,7 @@ layer2 = Layer.CreateFromMold(DM,layer1.gk_layer.OffsetMold(),"OFFSET",thickness
 layer2.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer2.Finalize(DM)
 layer2.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
@@ -166,7 +180,7 @@ layer3 = Layer.CreateFromMold(DM,layer2.gk_layer.OffsetMold(),"OFFSET",thickness
 layer3.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer3.Finalize(DM)
 layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
@@ -191,7 +205,7 @@ layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness
 layer4.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer4.Finalize(DM)
 layer4.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
@@ -213,7 +227,7 @@ layer5 = Layer.CreateFromMold(DM,layer4.gk_layer.OffsetMold(),"OFFSET",thickness
 layer5.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer5.Finalize(DM)
 layer5.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
@@ -234,7 +248,7 @@ layer6 = Layer.CreateFromMold(DM,layer5.gk_layer.OffsetMold(),"OFFSET",thickness
 layer6.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer6.Finalize(DM)
 layer6.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
@@ -254,7 +268,7 @@ layer7 = Layer.CreateFromMold(DM,layer6.gk_layer.OffsetMold(),"OFFSET",thickness
 layer7.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer7.Finalize(DM)
 layer7.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
@@ -274,7 +288,7 @@ layer8 = Layer.CreateFromMold(DM,layer7.gk_layer.OffsetMold(),"OFFSET",thickness
 layer8.CreateFiberObject(DM, np.array([0.0, 0.0, 3.0]), coordsys.fibervec,
                          np.cross(coordsys.fibervec, coordsys.crossfibervec),
                          _CFRPEngineeringProps,
-                         fiberint=0.25, meshsize=0.15)
+                         fiberint=0.25)
 
 layer8.Finalize(DM)
 layer8.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)

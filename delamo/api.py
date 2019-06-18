@@ -1,3 +1,17 @@
+# Copyright 2016-2018 Iowa State University Research Foundation, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Class hierarchy
 ---------------
@@ -18,6 +32,7 @@ import os
 import os.path
 import ast
 import numpy as np
+import traceback
 
 from delamo.codegen import codestore
 from delamo.codegen import namedbinding_wrapper
@@ -29,10 +44,10 @@ from delamo.layer import Layer as OCCLayer
 import delamo
 
 try:
-    from autofiber import AutoFiber
+    from delamo.autofiber.generator import AutoFiber
 except ImportError:
-    print("AutoFiber module not installed. Advanced fiber laying functions not available.")
-    pass
+    sys.stderr.write("AutoFiber not properly installed or missing dependencies. See:\n\nTraceback follows\n---------------------------\n\n")
+    traceback.print_exc()
 
 
 #import delamo.CADwrap
@@ -1149,10 +1164,12 @@ layup direction, etc."""
          element centroid. """
         self.orientation = AutoFiber(self.gk_layer.DMObj,
                                      point, fibervec, normal,
-                                     E=[mp[0], mp[1], mp[3]],
-                                     nu=[mp[3], mp[4], mp[5]],
-                                     G=[mp[6], mp[7], mp[8]],
-                                     fiberint=fiberint, angle_error=angle_error)
+                                     materialproperties=(
+                                         [mp[0], mp[1], mp[2]],
+                                         [mp[3], mp[4], mp[5]],
+                                         [mp[6], mp[7], mp[8]]),
+                                     fiberint=fiberint,
+                                     angle_error=angle_error)
 
         self.LayupFiberObject(DM, self.layupdirection, final_plotting=final_plotting)
 
