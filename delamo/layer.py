@@ -65,6 +65,8 @@ from OCC.Bnd import Bnd_Box
 from OCC.BRepBndLib import brepbndlib_Add
 from OCC.TopLoc import TopLoc_Location
 
+from OCC.BRepTools import breptools_Read
+from OCC.BRepTools import breptools_Write
 from OCC.STEPControl import STEPControl_Reader
 from OCC.STEPControl import STEPControl_Writer
 from OCC.STEPControl import STEPControl_ShellBasedSurfaceModel
@@ -139,6 +141,8 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
     """ Given a face, find and return a (point, normal, parPoint)
     that uniquely identifies the face. The point must be 
     significantly farther than tolerance from any edge"""
+
+    # breptools_Write(Face,"/tmp/PointFind.brep")
 
     # Evaluate reference parametric point
     faceSurface = BRep_Tool().Surface(Face)

@@ -84,6 +84,7 @@ from . import layer
 
 def FaceFaceIntersect(face1, face2):
 
+    # Adarsh: Try reimplementing with GeomAlgo_Splitter ***!!!
     section = BRepAlgoAPI_Section(face1, face2)
     section.Build()
 
@@ -709,6 +710,7 @@ class OCCModelBuilder(object):
             # raise ValueError("Break")
 
             # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
+            
             NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
 
             # Create reference parametric face for the no model zone using the NoModelWireShape
@@ -748,7 +750,8 @@ class OCCModelBuilder(object):
         split_layerbodyfaces=[]
 
         #step_writer = STEPControl_Writer()
-
+        # TODO: sdh: refactor from here down, add NOMODEL switch. ***!!!
+        
         while split_face_exp.More():
             split_face_shape=split_face_exp.Current()
             split_face_shapes.append(split_face_shape)
