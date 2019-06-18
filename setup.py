@@ -30,9 +30,9 @@ setup(name="delamo",
       url="http://thermal.cnde.iastate.edu/de-la-mo.xhtml",
       #ext_modules=[],
       package_dir={
-            'autofiber': 'autofiber/autofiber'
+            'delamo.autofiber': 'autofiber/autofiber'
       },
-      packages=["delamo", "autofiber"],
+      packages=["delamo", "delamo.autofiber"],
       scripts=["scripts/delamo_process","scripts/delamo_test_processor"],
       #cmdclass = {"build_ext": build_ext_openmp},
 )
