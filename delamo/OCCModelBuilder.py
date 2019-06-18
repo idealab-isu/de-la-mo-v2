@@ -260,12 +260,34 @@ def CreateDelaminationWire(delam_outline, tolerance):
     interpAPI = GeomAPI_Interpolate(delam_outpointsHArray.GetHandle(), True, tolerance)
     interpAPI.Perform()
     if interpAPI.IsDone():
-        delam_out_curve = interpAPI.Curve()
+        delam_curve = interpAPI.Curve()
     else:
         raise ValueError("Curve interpolation failed\n")
 
-    # Convert a curve to edge and then to Shape
-    delam_out_edge = BRepBuilderAPI_MakeEdge(delam_out_curve).Edge()
+
+    # Analyze the delam_curve for minimum curvature
+    numPts = 500
+    uStart = delam_curve.GetObject().FirstParameter()
+    uEnd = delam_curve.GetObject().LastParameter()
+    minCurvature = 100
+    for i in range(numPts):
+        u = i/(numPts*(uEnd-uStart)) + uStart
+        p = gp_Pnt(0,0,0)
+        v1 = gp_Vec(0,0,0)
+        v2 = gp_Vec(0,0,0)
+        delam_curve.GetObject().D2(u,p,v1,v2)
+        currentCurvature = v2.Magnitude()
+
+        if (currentCurvature < minCurvature):
+            minCurvature = currentCurvature
+            pass
+
+        pass
+    print("Curve parameter range : %f to %f"%(uStart, uEnd))
+    print("Minimum curvature of the delamination outline is : %f"%(minCurvature))
+
+    # Convert the curve to edge and then to Shape
+    delam_out_edge = BRepBuilderAPI_MakeEdge(delam_curve).Edge()
     WireBuilder = BRepBuilderAPI_MakeWire()
     WireBuilder.Add(delam_out_edge)
     WireShape = WireBuilder.Shape()
