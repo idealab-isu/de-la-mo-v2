@@ -197,7 +197,7 @@ def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
             [uMin, uMax, vMin, vMax] = SAS.Bounds()
 
             angleIncrement = 1
-            parIncrement = 0.01 * (math.sqrt((uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin))/math.sqrt(2.00))
+            parIncrement = 0.001 * (math.sqrt((uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin))/math.sqrt(2.00))
             pointFound = False
             for angle in range(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
@@ -1330,7 +1330,8 @@ class LayerMold(object):
 
                     DistSupport = DistCalc.SupportOnShape1(1).ShapeType()
                     if DistSupport != TopAbs_FACE:
-                        raise ValueError("Nearest point on shell to selected point %s for determining ORIGINAL direction is a vertex or and edge, not an interior point on the face. Select a different OrigDirPoint." % (str(OrigDirPoint)))
+                        raise ValueError("Nearest point on shell to selected point %s for determining ORIGINAL direction is a "
+                                         "vertex or and edge, not an interior point on the face. Select a different OrigDirPoint." % (str(OrigDirPoint)))
                     
                     (ClosestU,ClosestV)=DistCalc.ParOnFaceS1(1) # Evaluate (u,v) coordinates on this face of closest point
                     

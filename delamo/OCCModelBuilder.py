@@ -141,7 +141,7 @@ def FaceFaceIntersect(face1, face2):
     return edge_list
 
 
-def CreateReferenceFace(edges, face, tolerance):
+def CreateReferenceFace(edges, face, scale, tolerance):
     # Evaluate points on projected curve and evaluate the parametric points
     totalNumPoints = 0;
     if (len(edges) == 0):
@@ -150,7 +150,7 @@ def CreateReferenceFace(edges, face, tolerance):
     curveParPts = []
     for edgecnt in range(len(edges)):
         edge = edges[edgecnt]
-        numEdgePoints = 100
+        numEdgePoints = 250
         totalNumPoints = totalNumPoints + numEdgePoints
 
         # Make sure this edge has a pcurve (2d projected curve) on this face
@@ -167,7 +167,7 @@ def CreateReferenceFace(edges, face, tolerance):
             u = curvePoint.X()
             v = curvePoint.Y()
             #print(u, v)
-            curveParPts.append([u, v, 0])
+            curveParPts.append([u*scale, v*scale, 0])
             pass
 
     curvePointTemp = [curveParPts[0][0], curveParPts[0][1], curveParPts[0][2]]
@@ -549,6 +549,7 @@ class OCCModelBuilder(object):
         # NOTE: When regenerating layerbodies, do NOT give them new names unless they are being
         # split (which they aren't from this function)
 
+        parScale = 100
 
         ToolShapes=[]
         
@@ -604,7 +605,7 @@ class OCCModelBuilder(object):
             # Use the parametric curve to create a reference face that is inside the curve, i.e.
             # inside the delaminated zone, so that we can compare it with the faces that will be generated
             # by the splitting tool 
-            RefParamFace = CreateReferenceFace(ProjectionEdges, layerbodyface.Face, self.PointTolerance)
+            RefParamFace = CreateReferenceFace(ProjectionEdges, layerbodyface.Face, parScale, self.PointTolerance)
 
             # Generate faces connecting original and projected edges.
             # We will use this as a tool to do the cut. 
@@ -676,22 +677,20 @@ class OCCModelBuilder(object):
             # step_writer2=STEPControl_Writer()
             # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
             # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(mkOffset2.Shape(),STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
             # step_writer2.Write("../data/OffsetTest.STEP")
-            #
+
             # sys.modules["__main__"].__dict__.update(globals())
             # sys.modules["__main__"].__dict__.update(locals())
             # raise ValueError("Break")
 
-            if True:
-                # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
-                NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+            # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
+            NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
 
-                # Create reference parametric face for the no model zone using the NoModelWireShape
-                RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, self.PointTolerance)
-            else:
-                RefNoModelParamFace = None
+            # Create reference parametric face for the no model zone using the NoModelWireShape
+            RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, parScale, self.PointTolerance)
 
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
             ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
@@ -748,75 +747,77 @@ class OCCModelBuilder(object):
             for (ToolShape, NoModelToolShape, RefParamFace, NoModelRefParamFace) in ToolShapes:
                 # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
                 # mapped to the (x,y) plane. 
-                if (layer.OCCPointInFace((ParPoint[0],ParPoint[1],0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
-                    # Matched! ... This particular split_face is a delamination zone.
-                    # Need to do another split... but for now let's just call it
+                if (layer.OCCPointInFace((ParPoint[0]*parScale,ParPoint[1]*parScale,0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
+                    # Matched! This particular split_face is a delamination zone.
+                    # Need to do another split for the no model zone
                     #BCTypes[0]="CONTACT"
                     
-                    if True:
-                    
-                        # Use NoModelToolShape to do the split, operate on split_faces[0]
-                        NoModelSplitter=GEOMAlgo_Splitter()
-                        NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
-                        NoModelSplitter.AddTool(NoModelToolShape)
-                        NoModelSplitter.Perform()
-                        
-                        # Empty out split_faces and BCTypes list... we will refill them from the pieces
-                        split_faces = []
-                        BCTypes=[]
-                        
-                        NoModelSplitCompound = NoModelSplitter.Shape()
-                        NoModel_split_exp=TopExp_Explorer(NoModelSplitCompound,TopAbs_FACE)
-                        # Iterate over all faces
-                        numnomodelsplitfaces = 0
-                        
-                        # Iterate over the pieces that have been split. ... Some of these will
-                        # be for CONTACT b.c.'s, and some NOMODEL.
-                        #
-                        
-                        # We tell the difference by using a previously created reference face in parametric coordinates
-                        # that includes solely the CONTACT zone. We deterimine a parametric coordinates point for
-                        # each of these faces, and check it against the previously determine reference face
-                        while NoModel_split_exp.More():
-                            nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
-                            
-                            (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
-                        
-                            split_faces.append(nomodel_split_face_shape)
+                    #if True:
 
-                            # Debugging only
-                            #nmsp_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(NoModel_Split_Point[0],NoModel_Split_Point[1],NoModel_Split_Point[2])).Vertex()
-                            end_point = np.concatenate((NoModel_Split_ParPoint,(0,))) + np.array((0,0,1))*0.1
-                            nmsp_line = GC_MakeSegment(gp_Pnt(NoModel_Split_ParPoint[0],NoModel_Split_ParPoint[1],0.0),gp_Pnt(end_point[0],end_point[1],end_point[2])).Value()
-                            nmsp_edge = BRepBuilderAPI_MakeEdge(nmsp_line)
-                            nmsp_edge.Build()
-                            print("Saving breps!")
-                            
-                            #breptools_Write(nmsp_vertex,"/tmp/point.brep")
-                            breptools_Write(nmsp_edge.Shape(),"/tmp/line%d.brep" % (len(BCTypes)))
-                            breptools_Write(NoModelRefParamFace,"/tmp/face%d.brep" % (len(BCTypes)))
-                            
-                            # end debugging
-                            
-                            
-                            if (layer.OCCPointInFace((NoModel_Split_ParPoint[0],NoModel_Split_ParPoint[1],0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
-                                # Matched! ... This particular nomodel_split_face is a contact zone.
-                                #BCTypes[0]="CONTACT"
-                                BCTypes.append("CONTACT")
-                                pass
-                            else:
-                                BCTypes.append("NONE")
-                                pass
-                            
-                            
-                            NoModel_split_exp.Next()
+                    # Use NoModelToolShape to do the split, operate on split_faces[0]
+                    NoModelSplitter=GEOMAlgo_Splitter()
+                    NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
+                    NoModelSplitter.AddTool(NoModelToolShape)
+                    NoModelSplitter.Perform()
+
+                    # Empty out split_faces and BCTypes list. We will refill them from the pieces
+                    split_faces = []
+                    BCTypes=[]
+
+                    NoModelSplitCompound = NoModelSplitter.Shape()
+
+                    # Iterate over the pieces that have been split. Some of these will
+                    # be for CONTACT b.c.'s, and some NOMODEL.
+                    NoModel_split_exp=TopExp_Explorer(NoModelSplitCompound,TopAbs_FACE)
+
+                    # We tell the difference by using a previously created reference face in parametric coordinates
+                    # that includes solely the CONTACT zone. We determine a parametric coordinates point for
+                    # each of these faces, and check it against the previously determined reference face
+                    while NoModel_split_exp.More():
+                        nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
+
+                        (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
+                        split_faces.append(nomodel_split_face_shape)
+
+                        # Debugging only
+                        # nmsp_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(NoModel_Split_Point[0],NoModel_Split_Point[1],NoModel_Split_Point[2])).Vertex()
+                        # end_point = np.array((NoModel_Split_ParPoint[0]*parScale, NoModel_Split_ParPoint[1]*parScale, 0)) + np.array((0,0,1))*0.1
+                        # nmsp_line = GC_MakeSegment(gp_Pnt(NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),gp_Pnt(end_point[0],end_point[1],end_point[2])).Value()
+                        # nmsp_edge = BRepBuilderAPI_MakeEdge(nmsp_line)
+                        # nmsp_edge.Build()
+                        # print("Saving breps!")
+                        #
+                        # # Create new compound and make it valid.
+                        # compoundBuilder = BRep_Builder()
+                        # compoundShape = TopoDS_Compound()
+                        # compoundBuilder.MakeCompound(compoundShape)
+                        #
+                        # # The arguments order is: where to add, what to add.
+                        # compoundBuilder.Add(compoundShape, NoModelRefParamFace)
+                        # compoundBuilder.Add(compoundShape, RefParamFace)
+                        # compoundBuilder.Add(compoundShape, nmsp_edge.Shape())
+                        #
+                        # breptools_Write(compoundShape,"../data/lineface%d.brep" % (len(BCTypes)))
+                        # #breptools_Write(nmsp_vertex,"/data/point.brep")
+                        # #breptools_Write(NoModelRefParamFace,"../data/face%d.brep" % (len(BCTypes)))
+                        #
+                        # end debugging
+
+                        if (layer.OCCPointInFace((NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
+                            # This particular nomodel_split_face is a contact zone.
+                            BCTypes.append("CONTACT")
                             pass
+                        else:
+                            BCTypes.append("NONE")
+                            pass
+
+                        NoModel_split_exp.Next()
                         pass
+
+                    # Need not search for the piece any more, so break out of the for loop.
                     break
                 
                 pass
-
-            #print("Delam: Face of %s: Got point %s" % (layerbodyface.Owner.Name,str(Point)))
 
             
             for facecnt in range(len(split_faces)):
@@ -835,11 +836,12 @@ class OCCModelBuilder(object):
 
             split_face_exp.Next()
             pass
+
+
         print("Number of split faces %d"%(numsplitfaces))
 
         # split_face_shapes now should have two or more faces (TopoDS_Shape of type Face
         # Need to create a new layerbody with the original layerbodyfaces except for this one, and two new layerbodyfaces
-
 
         # Modify layerbody in-place
 
