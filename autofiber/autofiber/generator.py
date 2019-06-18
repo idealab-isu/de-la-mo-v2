@@ -21,9 +21,9 @@ from spatialnde.coordframes import coordframe
 from spatialnde.ndeobj import ndepart
 from spatialnde.cadpart.polygonalsurface_texcoordparameterization import polygonalsurface_texcoordparameterization
 
-from autofiber import geodesic as GEO
-from autofiber import analyze_uv as AUV
-from autofiber import optimization as OP
+from . import geodesic as GEO
+from . import analyze_uv as AUV
+from . import optimization as OP
 
 
 def calcunitvector(vector):

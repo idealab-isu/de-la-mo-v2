@@ -58,6 +58,8 @@ git checkout master
 git read-tree --prefix=autofiber/ -u autofiber_branch
 ```
 
+If git complains about the `read-tree` command then the directory may already be linked, especially if autofiber already exists, so you can continue.
+
 Now, if there is an update to autofiber we can switch to the autofiber branch and pull from autofiber_remote. Initially,
 you may need to commit the new autofiber package before you can merge or else the package might appear in a weird place.
 
