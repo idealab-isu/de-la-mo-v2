@@ -564,6 +564,10 @@ class OCCModelBuilder(object):
         return CommonFaces
 
     def _imprint_delamination_split_nomodel(self,split_faces, BCTypes,NoModelToolShape,NoModelRefParamFace,parScale):
+
+        assert(len(split_faces)==1)  # Assume we are starting with a single face
+        
+        
         # Use NoModelToolShape to do the split, operate on split_faces[0]
         NoModelSplitter=GEOMAlgo_Splitter()
         NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
@@ -675,14 +679,14 @@ class OCCModelBuilder(object):
                 if (layer.OCCPointInFace((ParPoint[0]*parScale,ParPoint[1]*parScale,0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
                     # Matched! This particular split_face is a delamination zone.
                     # Need to do another split for the no model zone
-                    #BCTypes[0]="CONTACT"
 
-                                            
-                    #if True:
-
-                    (split_faces, BCTypes) = self._imprint_delamination_split_nomodel(split_faces, BCTypes,NoModelToolShape,NoModelRefParamFace,parScale)
-
-                    # Since we've confired that this subface is a delaminated region and created a NOMODEL zone,
+                    if self.GapWidth == 0: # GapWidth of 0 disables NOMODEL zone
+                        BCTypes[0]="CONTACT"
+                        pass
+                    else: 
+                        (split_faces, BCTypes) = self._imprint_delamination_split_nomodel(split_faces, BCTypes,NoModelToolShape,NoModelRefParamFace,parScale)
+                        pass
+                    # Since we've confired that this subface is a delaminated region and created a NOMODEL zone (if applicable),
                     # we don't need to look further at whether this subface is a delaminated region
 
                     # ***!!! Possible bug: If this subface is part of two delaminations, then wouldn't those
@@ -699,13 +703,16 @@ class OCCModelBuilder(object):
             for facecnt in range(len(split_faces)):
                 split_face=split_faces[facecnt]
                 BCType=BCTypes[facecnt]
+
+                (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
+
                 split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
                                                           Point=Point,
                                                           Normal=Normal,
                                                           ParPoint=ParPoint,
                                                           Direction=layerbodyface.Direction,
                                                           Owner=layerbodyface.Owner,
-                                                          BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
+                                                          BCType=BCType)) 
                 numsplitfaces = numsplitfaces +1
                 pass
             
@@ -753,7 +760,11 @@ class OCCModelBuilder(object):
 
         # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
     
-    def _imprint_delaminations_update_layerbody(self,layerbody,layerbodyface,split_layerbodyfaces,parScale):
+    def _imprint_delaminations_update_layerbody(self,layerbody,layerbodyface,split_layerbodyfaces):
+        """ Update the layerbody, replacing the single face "layerbodyface" 
+        with the collection of split_layerbodyfaces. layerbodyface might be on 
+        either ORIG or OFFSET sides, so we try both possibilities"""
+        
         if layerbodyface in layerbody.FaceListOrig:
             # Remove original face
             print("Removing original face from orig side")
@@ -779,7 +790,93 @@ class OCCModelBuilder(object):
         layerbody.Rebuild_Shape()
         pass
     
+    def _imprint_delaminations_build_NOMODEL_tool(self,ToolShape,layerbodyface,parScale):
+        """ Build the tool for cutting out the NOMODEL zone. ToolShape was the surface that we 
+        intersected with the face to cut out the original delamination. The NOMODEL tool is made by 
+        offsetting ToolShape by gapwidth. We try offsetting in both directions and select the one which
+        gives us lower surface area, i.e. the inside offset. We then intersect the NOMODEL tool with 
+        layerbodyface.face to get the intersection curve on the face, then obtain the intersection 
+        curve in (u,v) coordinates. We use the (u,v) version to construct the nomodel reference param face
+        (RefNoModelParamFace)... which is used in identifying CONTACT vs NOMODEL boundary condition.""" 
 
+        # !!!*** (maybe we should just identify NOMODEL zone by moving epsilon from original cutting curve?)
+        
+        
+        # Try offsetting both ways and see which gives the smaller surface area 
+        mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, -self.GapWidth, self.PointTolerance,
+                                                                BRepOffset.BRepOffset_Skin,
+                                                                True, True,
+                                                                GeomAbs_Arc)
+        assert (mkOffset1.IsDone())
+        
+        mkOffset2 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, self.GapWidth, self.PointTolerance,
+                                                                BRepOffset.BRepOffset_Skin,
+                                                                True, True,
+                                                                GeomAbs_Arc)
+        
+        assert (mkOffset2.IsDone())
+        
+        GProps1=GProp_GProps()
+        brepgprop_SurfaceProperties(mkOffset1.Shape(),GProps1)
+        SurfArea1=GProps1.Mass()
+        
+        GProps2=GProp_GProps()
+        brepgprop_SurfaceProperties(mkOffset2.Shape(),GProps2)
+        SurfArea2=GProps2.Mass()
+        
+        if SurfArea1 > SurfArea2:
+            NoModelToolShells = mkOffset2.Shape()
+            pass
+        else:
+            NoModelToolShells = mkOffset1.Shape()
+            pass
+        
+        
+        # The NoModelToolShape is of type Shell.
+        # Need to extract the face from it and make sure there is only one face
+        
+        faceExplorer = TopExp_Explorer(NoModelToolShells, TopAbs_FACE)
+        
+        # Iterate over all edges
+        # return a list of edges
+        
+        face_list = []
+        while faceExplorer.More():
+            current_face = topods_Face(faceExplorer.Current())
+            face_list.append(current_face)
+            faceExplorer.Next()
+            pass
+        
+        if (len(face_list) != 1):
+            raise ValueError("Face offset for NoModelToolShape created multiple faces!")
+        
+        NoModelToolShape = face_list[0]
+        
+        # step_writer2=STEPControl_Writer()
+        # step_writer2.Transfer(layerbodyface.Face,STEPControl_ShellBasedSurfaceModel,True)
+        # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+        # #
+        # step_writer2.Transfer(mkOffset2.Shape(),STEPControl_ShellBasedSurfaceModel,True)
+        # #
+        # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
+        # #
+        # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
+        # step_writer2.Write("../data/OffsetTest.STEP")
+        #
+        # sys.modules["__main__"].__dict__.update(globals())
+        # sys.modules["__main__"].__dict__.update(locals())
+        # raise ValueError("Break")
+        
+        # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
+        
+        NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
+        
+        # Create reference parametric face for the no model zone using the NoModelWireShape
+        RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, parScale, self.PointTolerance)
+        
+        return (NoModelToolShape,RefNoModelParamFace)
+
+    
     def imprint_delaminations(self,layerbody,layerbodyface,delam_outlines):
         """Given a first layerbody and corresponding face, and a list of delamination outlines 
         (loop of 3D coordinates, hopefully projected onto the faces): 
@@ -898,80 +995,22 @@ class OCCModelBuilder(object):
 
             # Offset the tool shape to create the inner tool shape for the no model zone
 
-            # Try offsetting both ways and see which gives the smaller surface area 
-            mkOffset1 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, -self.GapWidth, self.PointTolerance,
-                                                                   BRepOffset.BRepOffset_Skin,
-                                                                   True, True,
-                                                                   GeomAbs_Arc)
-            assert (mkOffset1.IsDone())
-            
-            mkOffset2 = BRepOffsetAPI.BRepOffsetAPI_MakeOffsetShape(ToolShape, self.GapWidth, self.PointTolerance,
-                                                                   BRepOffset.BRepOffset_Skin,
-                                                                   True, True,
-                                                                   GeomAbs_Arc)
-            
-            assert (mkOffset2.IsDone())
+            if self.GapWidth > 0: # only create NOMODEL tool if we have a nonzero GapWidth
 
-            GProps1=GProp_GProps()
-            brepgprop_SurfaceProperties(mkOffset1.Shape(),GProps1)
-            SurfArea1=GProps1.Mass()
+                (NoModelToolShape,RefNoModelParamFace) = self._imprint_delaminations_build_NOMODEL_tool(ToolShape,layerbodyface,parScale)
 
-            GProps2=GProp_GProps()
-            brepgprop_SurfaceProperties(mkOffset2.Shape(),GProps2)
-            SurfArea2=GProps2.Mass()
-
-            if SurfArea1 > SurfArea2:
-                NoModelToolShells = mkOffset2.Shape()
                 pass
             else:
-                NoModelToolShells = mkOffset1.Shape()
+                # self.GapWidth == 0 -> We don't need the NOMODEL zone tools 
+                NoModelToolShape = None
+                RefNoModelParamFace = None
                 pass
-
-
-            # The NoModelToolShape is of type Shell.
-            # Need to extract the face from it and make sure there is only one face
-
-            faceExplorer = TopExp_Explorer(NoModelToolShells, TopAbs_FACE)
-
-            # Iterate over all edges
-            # return a list of edges
-
-            face_list = []
-            while faceExplorer.More():
-                current_face = topods_Face(faceExplorer.Current())
-                face_list.append(current_face)
-                faceExplorer.Next()
-                pass
-
-            if (len(face_list) != 1):
-                raise ValueError("Face offset for NoModelToolShape created multiple faces!")
-
-            NoModelToolShape = face_list[0]
-
-            # step_writer2=STEPControl_Writer()
-            # step_writer2.Transfer(layerbodyface.Face,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # # step_writer2.Transfer(mkOffset2.Shape(),STEPControl_ShellBasedSurfaceModel,True)
-            # # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Write("../data/OffsetTest.STEP")
-            #
-            # sys.modules["__main__"].__dict__.update(globals())
-            # sys.modules["__main__"].__dict__.update(locals())
-            # raise ValueError("Break")
-
-            # Intersect the NoModelToolShape with the face to create the NoModelRefParamFace
             
-            NoModelWireEdges = FaceFaceIntersect(NoModelToolShape, layerbodyface.Face)
-
-            # Create reference parametric face for the no model zone using the NoModelWireShape
-            RefNoModelParamFace = CreateReferenceFace(NoModelWireEdges, layerbodyface.Face, parScale, self.PointTolerance)
-
             # Create a Tuple to store the ToolShape and the NoModelToolShape, and RefParamFace -- used to identify the inside region
             ToolShapes.append((ToolShape, NoModelToolShape, RefParamFace, RefNoModelParamFace))
-
+                
             pass
-        
+            
         # Split the face using the delamination zones
         GASplitter=GEOMAlgo_Splitter()
         GASplitter.AddArgument(topods_Face(layerbodyface.Face))
@@ -998,7 +1037,7 @@ class OCCModelBuilder(object):
 
         # Modify layerbody in-place with the original layerbodyfaces except for this one,
 
-        self._imprint_delaminations_update_layerbody(layerbody,layerbodyface,split_layerbodyfaces,parScale)
+        self._imprint_delaminations_update_layerbody(layerbody,layerbodyface,split_layerbodyfaces)
         
 
         #step_writer = STEPControl_Writer()
