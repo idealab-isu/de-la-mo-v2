@@ -563,24 +563,240 @@ class OCCModelBuilder(object):
 
         return CommonFaces
 
+    def _imprint_delamination_split_nomodel(self,split_faces, BCTypes,NoModelToolShape,NoModelRefParamFace,parScale):
+        # Use NoModelToolShape to do the split, operate on split_faces[0]
+        NoModelSplitter=GEOMAlgo_Splitter()
+        NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
+        NoModelSplitter.AddTool(NoModelToolShape)
+        NoModelSplitter.Perform()
+        
+        # Empty out split_faces and BCTypes list. We will refill them from the pieces
+        split_faces = []
+        BCTypes=[]
+        
+        NoModelSplitCompound = NoModelSplitter.Shape()
+        
+        # Iterate over the pieces that have been split. Some of these will
+        # be for CONTACT b.c.'s, and some NOMODEL.
+        NoModel_split_exp=TopExp_Explorer(NoModelSplitCompound,TopAbs_FACE)
+        
+        # We tell the difference by using a previously created reference face in parametric coordinates
+        # that includes solely the CONTACT zone. We determine a parametric coordinates point for
+        # each of these faces, and check it against the previously determined reference face
+        while NoModel_split_exp.More():
+            nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
+            
+            (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
+            split_faces.append(nomodel_split_face_shape)
+            
+            # Debugging only
+            # nmsp_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(NoModel_Split_Point[0],NoModel_Split_Point[1],NoModel_Split_Point[2])).Vertex()
+            # end_point = np.array((NoModel_Split_ParPoint[0]*parScale, NoModel_Split_ParPoint[1]*parScale, 0)) + np.array((0,0,1))*0.1
+            # nmsp_line = GC_MakeSegment(gp_Pnt(NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),gp_Pnt(end_point[0],end_point[1],end_point[2])).Value()
+            # nmsp_edge = BRepBuilderAPI_MakeEdge(nmsp_line)
+            # nmsp_edge.Build()
+            # print("Saving breps!")
+            #
+            # # Create new compound and make it valid.
+            # compoundBuilder = BRep_Builder()
+            # compoundShape = TopoDS_Compound()
+            # compoundBuilder.MakeCompound(compoundShape)
+            #
+            # # The arguments order is: where to add, what to add.
+            # compoundBuilder.Add(compoundShape, NoModelRefParamFace)
+            # compoundBuilder.Add(compoundShape, RefParamFace)
+            # compoundBuilder.Add(compoundShape, nmsp_edge.Shape())
+            #
+            # breptools_Write(compoundShape,"../data/lineface%d.brep" % (len(BCTypes)))
+            # #breptools_Write(nmsp_vertex,"/data/point.brep")
+            # #breptools_Write(NoModelRefParamFace,"../data/face%d.brep" % (len(BCTypes)))
+            #
+            # end debugging
+            
+            if (layer.OCCPointInFace((NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
+                # This particular nomodel_split_face is a contact zone.
+                BCTypes.append("CONTACT")
+                pass
+            else:
+                BCTypes.append("NONE")
+                pass
+            
+            NoModel_split_exp.Next()
+            pass
+        return (split_faces,BCTypes)
+    
+
+    def _imprint_delaminations_assign_bcs(self,layerbodyface,SplitFace,ToolShapes,parScale):
+        """ SplitFace is an OpenCascade face that has been split into pieces by imprinting. 
+        Need to identify and apply the appropriate boundary conditions"""
+        
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
+        ##step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
+        ##step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
+        #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Write("../data/allShapes.STEP")
+
+        split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
+        # Iterate over all faces
+        numsplitfaces = 0
+        split_face_shapes=[]
+        split_layerbodyfaces=[]
+
+        #step_writer = STEPControl_Writer()
+        # TODO: sdh: refactor from here down, add NOMODEL switch. ***!!!
+
+        # Go through the split faces
+        while split_face_exp.More():
+            split_face_shape=split_face_exp.Current()
+            split_face_shapes.append(split_face_shape)
+
+            
+            #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
+
+            # Since this face may be subdivided by a NOMODEL zone split,
+            # need a place to keep track of the pieces, this
+            # split_faces list.
+            # Also keep a parallel list of BCTypes
+            split_faces = [ topods_Face(split_face_shape) ]
+            BCTypes= [ "TIE" ] # default
+            
+            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_faces[0],self.PointTolerance,self.NormalTolerance)
+
+            # Match the split face with all of the ToolShapes to see if this particular split_face is part of
+            # any of the tools (delaminations). If it is, then it is inside a delaminated region and needs to
+            # be split into its CONTACT and NOMODEL zones, and those pieces must be identified and
+            # assigned BCTypes of CONTACT or NOMODEL
+
+            for (ToolShape, NoModelToolShape, RefParamFace, NoModelRefParamFace) in ToolShapes:
+                
+                # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
+                # mapped to the (x,y) plane. 
+                if (layer.OCCPointInFace((ParPoint[0]*parScale,ParPoint[1]*parScale,0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
+                    # Matched! This particular split_face is a delamination zone.
+                    # Need to do another split for the no model zone
+                    #BCTypes[0]="CONTACT"
+
+                                            
+                    #if True:
+
+                    (split_faces, BCTypes) = self._imprint_delamination_split_nomodel(split_faces, BCTypes,NoModelToolShape,NoModelRefParamFace,parScale)
+
+                    # Since we've confired that this subface is a delaminated region and created a NOMODEL zone,
+                    # we don't need to look further at whether this subface is a delaminated region
+
+                    # ***!!! Possible bug: If this subface is part of two delaminations, then wouldn't those
+                    # give different NoModelToolShapes? ... I think this will only work correctly for
+                    # non-overlapping delaminations
+                    break
+                
+                pass
+
+
+            # go through list of subfaces and corresponding bctypes,
+            # and create and append a LayerBodyFace to the split_layerbodyfaces list for each
+            
+            for facecnt in range(len(split_faces)):
+                split_face=split_faces[facecnt]
+                BCType=BCTypes[facecnt]
+                split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
+                                                          Point=Point,
+                                                          Normal=Normal,
+                                                          ParPoint=ParPoint,
+                                                          Direction=layerbodyface.Direction,
+                                                          Owner=layerbodyface.Owner,
+                                                          BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
+                numsplitfaces = numsplitfaces +1
+                pass
+            
+
+            split_face_exp.Next()
+            pass
+
+
+        print("Number of split faces %d"%(numsplitfaces))
+
+        return split_layerbodyfaces
+        # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
+
+        # Create a reference face using the ProjectionEdges and layerbodyface.Face
+        # Project the outline onto the face to figure out Boundary Conditions
+        #projectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
+
+        #Make wire from edges
+        #WireBuilder = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
+        #WirePerimeter = TopoDS_Compound()
+        #WireBuilder.MakeCompound(WirePerimeter)
+
+        #delamWire = TopoDS_Wire()
+        #WireBuilder.MakeWire(delamWire)
+
+        #for edgecnt in range(len(edge_edges)):
+        #    projectionEdge = projectionEdges[edgecnt]
+        #    WireBuilder.Add(delamWire, projectionEdge)
+        #    pass
+
+        #delamSurface = BRep_Tool.Surface(layerbodyface.Face)
+        #FaceBuilder = BRepBuilderAPI_MakeFace(delamSurface, self.PointTolerance)
+        #delamFace = FaceBuilder.Face()
+        #FaceBuilder.Add(delamWire)
+
+        #error = FaceBuilder.Error()
+        #print("Error : %d"%(error))
+        #if (error != BRepBuilderAPI_Error.BRepBuilderAPI_FaceDone):
+        #    print("Face generation failed!")
+
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(delamFace,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer2.Transfer(delamWire,STEPControl_GeometricCurveSet,True)
+        #step_writer2.Write("../data/allShapes.STEP")
+
+        # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
+    
+    def _imprint_delaminations_update_layerbody(self,layerbody,layerbodyface,split_layerbodyfaces,parScale):
+        if layerbodyface in layerbody.FaceListOrig:
+            # Remove original face
+            print("Removing original face from orig side")
+            del layerbody.FaceListOrig[layerbody.FaceListOrig.index(layerbodyface)]
+            # Add new faces
+            for split_layerbodyface in split_layerbodyfaces:
+                layerbody.FaceListOrig.append(split_layerbodyface)
+                pass
+            pass
+        
+        if layerbodyface in layerbody.FaceListOffset:
+            # Remove offset face
+            print("Removing original face from offset side")
+            del layerbody.FaceListOffset[layerbody.FaceListOffset.index(layerbodyface)]
+            # Add new faces
+            for split_layerbodyface in split_layerbodyfaces:
+                layerbody.FaceListOffset.append(split_layerbodyface)
+                pass
+            pass
+
+
+
+        layerbody.Rebuild_Shape()
+        pass
+    
+
     def imprint_delaminations(self,layerbody,layerbodyface,delam_outlines):
-        """Given a first layerbody and corresponding face, and a second 
-        layerbody and corresponding face, and a list of delamination outlines 
+        """Given a first layerbody and corresponding face, and a list of delamination outlines 
         (loop of 3D coordinates, hopefully projected onto the faces): 
          A. Loop over each delam outline
-           1. Identify the regions of facebody1/2 that are inside delam_outline
-           2. Create an offset curve a distance of self.GapWidth inside delam_outline
-           3. Imprint both delam_outline and the offset curve
-           4. Identify the regions of facebody1/2 that are between delam_outline and the offset
-              curve to have "NOMODEL" BCType unless they already had "CONTACT" BCType 
-           5. Identify the regions of facebody1/2 that are inside the offset curve to have "CONTACT"
+           1. Identify the regions of layerbodyface that are inside delam_outlines
+           2. Create an offset curve a distance of self.GapWidth inside delam_outlines
+           3. Imprint both delam_outlinse and the offset curves
+           4. Identify the regions of layerbodyface that are between delam_outlines and the offset
+              curves to have "NOMODEL" BCType unless they already had "CONTACT" BCType 
+           5. Identify the regions of facebody1/2 that are inside the offset curves to have "CONTACT"
               BCType
-          B. Generate new replacements for layerbody1 and layerbody2 with newly constructed
+          B. Update layerbody with newly constructed
               imprinted faces, marked as determined above. 
-           1. The replaced layerbody1 and layerbody2 may have facebody1 and facebody2 
-              replaced/subdivided, but other faces in layerbodies1/2 should remain unchanged. 
-          C. Return (replacement_layerbody1, replacement_layerbody2)"""
-
+           1. The updated layerbody may have layerbodyface 
+              replaced/subdivided, but other faces in layerbody remain unchanged. 
+"""
+        
         # NOTE: May need additional parameters (adjacent surfaces or faces?) to do the
         # delam_outline offset curve?
 
@@ -750,199 +966,19 @@ class OCCModelBuilder(object):
 
         SplitFace = GASplitter.Shape()
         # Hopefully this did not damage layerbodyface
+
+
+        # Now that the face has been imprinted by the various delaminations
+        # need to assign the boundary conditions and imprint nomodel zones, etc. 
+
+        split_layerbodyfaces = self._imprint_delaminations_assign_bcs(layerbodyface,SplitFace,ToolShapes,parScale)
         
-        #step_writer2=STEPControl_Writer()
-        #step_writer2.Transfer(SideShape,STEPControl_ShellBasedSurfaceModel,True)
-        ##step_writer2.Transfer(layerbody.Shape, STEPControl_ManifoldSolidBrep, True)
-        ##step_writer2.Transfer(layerbody2.Shape, STEPControl_ManifoldSolidBrep, True)
-        #step_writer2.Transfer(SplitFace,STEPControl_ShellBasedSurfaceModel,True)
-        #step_writer2.Write("../data/allShapes.STEP")
-
-        split_face_exp=TopExp_Explorer(SplitFace,TopAbs_FACE)
-        # Iterate over all faces
-        numsplitfaces = 0
-        split_face_shapes=[]
-        split_layerbodyfaces=[]
-
-        #step_writer = STEPControl_Writer()
-        # TODO: sdh: refactor from here down, add NOMODEL switch. ***!!!
         
-        while split_face_exp.More():
-            split_face_shape=split_face_exp.Current()
-            split_face_shapes.append(split_face_shape)
+        # split_layerbodyfaces should have two or more faces (TopoDS_Shape of type Face
 
-            
-            #step_writer.Transfer(split_face_shape, STEPControl_ShellBasedSurfaceModel, True)
+        # Modify layerbody in-place with the original layerbodyfaces except for this one,
 
-            split_faces = [ topods_Face(split_face_shape) ]
-            BCTypes= [ "TIE" ] # default
-            
-            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_faces[0],self.PointTolerance,self.NormalTolerance)
-
-            # Match the split face with all of the ToolShapes, and see if the split_face is part of
-            # any of the tools. If it is, then it is inside a delaminated region and needs to
-            # be split into its CONTACT and NOMODEL zones, and those pieces must be identified and
-            # assigned BCTypes of CONTACT or NOMODEL
-
-            for (ToolShape, NoModelToolShape, RefParamFace, NoModelRefParamFace) in ToolShapes:
-                # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
-                # mapped to the (x,y) plane. 
-                if (layer.OCCPointInFace((ParPoint[0]*parScale,ParPoint[1]*parScale,0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
-                    # Matched! This particular split_face is a delamination zone.
-                    # Need to do another split for the no model zone
-                    #BCTypes[0]="CONTACT"
-                    
-                    #if True:
-
-                    # Use NoModelToolShape to do the split, operate on split_faces[0]
-                    NoModelSplitter=GEOMAlgo_Splitter()
-                    NoModelSplitter.AddArgument(topods_Face(split_faces[0]))
-                    NoModelSplitter.AddTool(NoModelToolShape)
-                    NoModelSplitter.Perform()
-
-                    # Empty out split_faces and BCTypes list. We will refill them from the pieces
-                    split_faces = []
-                    BCTypes=[]
-
-                    NoModelSplitCompound = NoModelSplitter.Shape()
-
-                    # Iterate over the pieces that have been split. Some of these will
-                    # be for CONTACT b.c.'s, and some NOMODEL.
-                    NoModel_split_exp=TopExp_Explorer(NoModelSplitCompound,TopAbs_FACE)
-
-                    # We tell the difference by using a previously created reference face in parametric coordinates
-                    # that includes solely the CONTACT zone. We determine a parametric coordinates point for
-                    # each of these faces, and check it against the previously determined reference face
-                    while NoModel_split_exp.More():
-                        nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
-
-                        (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
-                        split_faces.append(nomodel_split_face_shape)
-
-                        # Debugging only
-                        # nmsp_vertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp_Pnt(NoModel_Split_Point[0],NoModel_Split_Point[1],NoModel_Split_Point[2])).Vertex()
-                        # end_point = np.array((NoModel_Split_ParPoint[0]*parScale, NoModel_Split_ParPoint[1]*parScale, 0)) + np.array((0,0,1))*0.1
-                        # nmsp_line = GC_MakeSegment(gp_Pnt(NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),gp_Pnt(end_point[0],end_point[1],end_point[2])).Value()
-                        # nmsp_edge = BRepBuilderAPI_MakeEdge(nmsp_line)
-                        # nmsp_edge.Build()
-                        # print("Saving breps!")
-                        #
-                        # # Create new compound and make it valid.
-                        # compoundBuilder = BRep_Builder()
-                        # compoundShape = TopoDS_Compound()
-                        # compoundBuilder.MakeCompound(compoundShape)
-                        #
-                        # # The arguments order is: where to add, what to add.
-                        # compoundBuilder.Add(compoundShape, NoModelRefParamFace)
-                        # compoundBuilder.Add(compoundShape, RefParamFace)
-                        # compoundBuilder.Add(compoundShape, nmsp_edge.Shape())
-                        #
-                        # breptools_Write(compoundShape,"../data/lineface%d.brep" % (len(BCTypes)))
-                        # #breptools_Write(nmsp_vertex,"/data/point.brep")
-                        # #breptools_Write(NoModelRefParamFace,"../data/face%d.brep" % (len(BCTypes)))
-                        #
-                        # end debugging
-
-                        if (layer.OCCPointInFace((NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
-                            # This particular nomodel_split_face is a contact zone.
-                            BCTypes.append("CONTACT")
-                            pass
-                        else:
-                            BCTypes.append("NONE")
-                            pass
-
-                        NoModel_split_exp.Next()
-                        pass
-
-                    # Need not search for the piece any more, so break out of the for loop.
-                    break
-                
-                pass
-
-            
-            for facecnt in range(len(split_faces)):
-                split_face=split_faces[facecnt]
-                BCType=BCTypes[facecnt]
-                split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
-                                                          Point=Point,
-                                                          Normal=Normal,
-                                                          ParPoint=ParPoint,
-                                                          Direction=layerbodyface.Direction,
-                                                          Owner=layerbodyface.Owner,
-                                                          BCType=BCType)) # !!!*** BCType needs to be set correctly ***!!!
-                numsplitfaces = numsplitfaces +1
-                pass
-            
-
-            split_face_exp.Next()
-            pass
-
-
-        print("Number of split faces %d"%(numsplitfaces))
-
-        # split_face_shapes now should have two or more faces (TopoDS_Shape of type Face
-        # Need to create a new layerbody with the original layerbodyfaces except for this one, and two new layerbodyfaces
-
-        # Modify layerbody in-place
-
-        if layerbodyface in layerbody.FaceListOrig:
-            # Remove original face
-            print("Removing original face from orig side")
-            del layerbody.FaceListOrig[layerbody.FaceListOrig.index(layerbodyface)]
-            # Add new faces
-            for split_layerbodyface in split_layerbodyfaces:
-                layerbody.FaceListOrig.append(split_layerbodyface)
-                pass
-            pass
-        
-        if layerbodyface in layerbody.FaceListOffset:
-            # Remove offset face
-            print("Removing original face from offset side")
-            del layerbody.FaceListOffset[layerbody.FaceListOffset.index(layerbodyface)]
-            # Add new faces
-            for split_layerbodyface in split_layerbodyfaces:
-                layerbody.FaceListOffset.append(split_layerbodyface)
-                pass
-            pass
-
-        # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
-
-        # Create a reference face using the ProjectionEdges and layerbodyface.Face
-        # Project the outline onto the face to figure out Boundary Conditions
-        #projectionEdges = self.ProjectEdgesOntoFace(edge_edges, layerbodyface.Face)
-
-        #Make wire from edges
-        #WireBuilder = BRep_Builder()  # !!!*** Are build and Perimeter still necessary????
-        #WirePerimeter = TopoDS_Compound()
-        #WireBuilder.MakeCompound(WirePerimeter)
-
-        #delamWire = TopoDS_Wire()
-        #WireBuilder.MakeWire(delamWire)
-
-        #for edgecnt in range(len(edge_edges)):
-        #    projectionEdge = projectionEdges[edgecnt]
-        #    WireBuilder.Add(delamWire, projectionEdge)
-        #    pass
-
-        #delamSurface = BRep_Tool.Surface(layerbodyface.Face)
-        #FaceBuilder = BRepBuilderAPI_MakeFace(delamSurface, self.PointTolerance)
-        #delamFace = FaceBuilder.Face()
-        #FaceBuilder.Add(delamWire)
-
-        #error = FaceBuilder.Error()
-        #print("Error : %d"%(error))
-        #if (error != BRepBuilderAPI_Error.BRepBuilderAPI_FaceDone):
-        #    print("Face generation failed!")
-
-        #step_writer2=STEPControl_Writer()
-        #step_writer2.Transfer(delamFace,STEPControl_ShellBasedSurfaceModel,True)
-        #step_writer2.Transfer(delamWire,STEPControl_GeometricCurveSet,True)
-        #step_writer2.Write("../data/allShapes.STEP")
-
-        # (Could also do similar process on side faces, but how could we ever get a delamination on the side faces???)
-
-
-        layerbody.Rebuild_Shape()
+        self._imprint_delaminations_update_layerbody(layerbody,layerbodyface,split_layerbodyfaces,parScale)
         
 
         #step_writer = STEPControl_Writer()
