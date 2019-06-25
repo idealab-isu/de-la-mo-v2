@@ -31,7 +31,7 @@ import os
 DM=DelamoModeler.Initialize(globals(),
                             pointtolerancefactor=100.0,
                             normaltolerance=100e-4,
-                            GapWidth=0.20)
+                            GapWidth=0)
 
 # This script then generates both a CAD file and a Python script.
 # The Python script can be run from Abaqus. It includes the 

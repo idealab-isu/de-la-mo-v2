@@ -139,7 +139,7 @@ for layernum in range(16):
     # replay (.rpy) file. 
     FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                        createStepName=ApplyForceStep.name,
-                       region=layer.singlepart.GetInstanceFaceRegion(FixedPoint,0.07))
+                       region=layer.singlepart.GetInstanceFaceRegion(FixedPoint,0.02))
 
     if previouslayer is not None:
         bond_layers(DM,previouslayer, layer)

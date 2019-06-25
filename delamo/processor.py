@@ -356,6 +356,7 @@ def add_delams_to_bond_layers_calls(basename,basename_withpath,output_directory,
     bondlayers_calls=rb_tree.find_all("atomtrailers",lambda node: node[0].value=="bond_layers" and isinstance(node[1],redbaron.CallNode))
 
     sourcelines=[]
+
     
     for bondlayers_call in bondlayers_calls:
 

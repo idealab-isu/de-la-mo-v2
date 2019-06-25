@@ -723,6 +723,9 @@ class OCCModelBuilder(object):
 
         print("Number of split faces %d"%(numsplitfaces))
 
+        if numsplitfaces==0:
+            raise ValueError("No split faces")
+
         return split_layerbodyfaces
         # !!!***  Need to set BCTType on each generate LayerBodyFace !!!***
 
@@ -901,6 +904,9 @@ class OCCModelBuilder(object):
         # split (which they aren't from this function)
 
         parScale = 100
+
+        if len(delam_outlines)==0:
+            return # nothing to do if there are no delaminations
 
         ToolShapes=[]
         
