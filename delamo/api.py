@@ -43,11 +43,7 @@ from delamo.OCCModelBuilder import OCCModelBuilder
 from delamo.layer import Layer as OCCLayer
 import delamo
 
-try:
-    from delamo.autofiber.generator import AutoFiber
-except ImportError:
-    sys.stderr.write("AutoFiber not properly installed or missing dependencies. See:\n\nTraceback follows\n---------------------------\n\n")
-    traceback.print_exc()
+from delamo.autofiber.generator import AutoFiber
 
 
 #import delamo.CADwrap

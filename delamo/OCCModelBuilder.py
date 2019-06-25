@@ -921,21 +921,41 @@ class OCCModelBuilder(object):
             SurfArea2=GProps2.Mass()
 
             if SurfArea1 > SurfArea2:
-                NoModelToolShape = mkOffset2.Shape()
+                NoModelToolShells = mkOffset2.Shape()
                 pass
             else:
-                NoModelToolShape = mkOffset1.Shape()
+                NoModelToolShells = mkOffset1.Shape()
                 pass
 
 
-            # step_writer2=STEPControl_Writer()
-            # step_writer2.Transfer(ToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(mkOffset2.Shape(),STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
-            # step_writer2.Write("../data/OffsetTest.STEP")
+            # The NoModelToolShape is of type Shell.
+            # Need to extract the face from it and make sure there is only one face
 
+            faceExplorer = TopExp_Explorer(NoModelToolShells, TopAbs_FACE)
+
+            # Iterate over all edges
+            # return a list of edges
+
+            face_list = []
+            while faceExplorer.More():
+                current_face = topods_Face(faceExplorer.Current())
+                face_list.append(current_face)
+                faceExplorer.Next()
+                pass
+
+            if (len(face_list) != 1):
+                raise ValueError("Face offset for NoModelToolShape created multiple faces!")
+
+            NoModelToolShape = face_list[0]
+
+            # step_writer2=STEPControl_Writer()
+            # step_writer2.Transfer(layerbodyface.Face,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Transfer(NoModelToolShape,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(mkOffset2.Shape(),STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(RefParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # # step_writer2.Transfer(RefNoModelParamFace,STEPControl_ShellBasedSurfaceModel,True)
+            # step_writer2.Write("../data/OffsetTest.STEP")
+            #
             # sys.modules["__main__"].__dict__.update(globals())
             # sys.modules["__main__"].__dict__.update(locals())
             # raise ValueError("Break")
