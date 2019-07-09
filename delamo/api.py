@@ -854,12 +854,16 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
                                              algorithm=Algorithm)
         sys.stderr.write("WARNING: Assuming region for sweep path is cells[0] (FIXME) and edge is edges[1]\n")
         # !!!*** ALSO need to add contact model for delaminated region across cohesive layer ***!!!
-        assert(len(self.fe_part_meshing.cells)==1)   # Given how we construct the cohesive layer it should never have anything but exactly one cell
+        
+        assembly_assert=self.DM.assemblyinstrs.preexisting_variable("assert")
+        assembly_len=self.DM.assemblyinstrs.preexisting_variable("len")
+
+        assembly_assert(assembly_len(self.fe_part_meshing.cells)==1)   # Given how we construct the cohesive layer it should never have anything but exactly one cell
         #self.fe_part_meshing.NEED_TO_DETERMINE_SWEEP_PATH
 
         (SweepPathEdgePoint, SweepPathEdgeTangent) = self.gk_layerbody.GetOffsetEdge()
         # Get proxied Abaqus edge object. 
-        SweepPathEdge=self.GetPartEdge_point_tangent((SweepPathEdgePoint,SweepPathEdgeTangent),self.abqpointtolerance,self.tangenttolerance)
+        SweepPathEdge=self.GetPartEdge_point_tangent((SweepPathEdgePoint,SweepPathEdgeTangent),self.DM.abqpointtolerance,self.DM.tangenttolerance)
 
         self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=SweepPathEdge,sense=SweepSense)
         

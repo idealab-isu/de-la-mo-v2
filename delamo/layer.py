@@ -1303,7 +1303,7 @@ class LayerBody(object):
             intersection_curve.GetObject().D1((start + end)*0.5, point, tangent)
             break
 
-        return (point,tangent)
+        return (np.array((point.X(),point.Y(),point.Z()),dtype='d'),np.array((tangent.X(),tangent.Y(),tangent.Z()),dtype='d'))
 
     # !!!*** Need API to provide points for a wire segment to do the splitting,
     # Need to connect the wire segment to the domain boundary
