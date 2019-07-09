@@ -857,9 +857,11 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
         assert(len(self.fe_part_meshing.cells)==1)   # Given how we construct the cohesive layer it should never have anything but exactly one cell
         #self.fe_part_meshing.NEED_TO_DETERMINE_SWEEP_PATH
 
-        SweepPathEdge = self.gk_layerbody.
+        (SweepPathEdgePoint, SweepPathEdgeTangent) = self.gk_layerbody.GetOffsetEdge()
+        # Get proxied Abaqus edge object. 
+        SweepPathEdge=self.GetPartEdge_point_tangent((SweepPathEdgePoint,SweepPathEdgeTangent),self.abqpointtolerance,self.tangenttolerance)
 
-        self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=self.fe_part_meshing.edges[5],sense=SweepSense)
+        self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=SweepPathEdge,sense=SweepSense)
         
         HexElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D8,elemLibrary=ElemLibrary)
         WedgeElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D6,elemLibrary=ElemLibrary)
