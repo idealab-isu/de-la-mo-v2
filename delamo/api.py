@@ -854,7 +854,11 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
                                              algorithm=Algorithm)
         sys.stderr.write("WARNING: Assuming region for sweep path is cells[0] (FIXME) and edge is edges[1]\n")
         # !!!*** ALSO need to add contact model for delaminated region across cohesive layer ***!!!
+        assert(len(self.fe_part_meshing.cells)==1)   # Given how we construct the cohesive layer it should never have anything but exactly one cell
         #self.fe_part_meshing.NEED_TO_DETERMINE_SWEEP_PATH
+
+        SweepPathEdge = self.gk_layerbody.
+
         self.fe_part_meshing.setSweepPath(region=self.fe_part_meshing.cells[0],edge=self.fe_part_meshing.edges[5],sense=SweepSense)
         
         HexElemType = self.DM.mesh.ElemType(elemCode=abqC.COH3D8,elemLibrary=ElemLibrary)
@@ -1711,10 +1715,12 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         #import pdb
         #pdb.set_trace()
 
-        if delaminationlist is not None:
-            DM.modelbuilder.apply_delaminations(layer1.gk_layer,cohesive_layer.gk_layer,delaminationlist) # Imprint faces on both sides, 
-            pass
+        #if delaminationlist is not None:
+        #    DM.modelbuilder.apply_delaminations(layer1.gk_layer,cohesive_layer.gk_layer,delaminationlist) # Imprint faces on both sides, 
+        #    pass
         
+        # Now that delaminations have been used to break the cohesive layer into pieces, imprint the broken-down cohesive layer onto layer1
+        DM.modelbuilder.imprint_layers(layer1.gk_layer,cohesive_layer.gk_layer)
 
         # return adjacent layers in face_adjacency_list
         face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,cohesive_layer.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })  

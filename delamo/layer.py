@@ -1253,6 +1253,10 @@ class LayerBody(object):
             pass
         return NewLayerBodies
 
+    def GetOffsetEdge(self):
+        # return an edge along the offset direction (between ORIG and OFFSET faces)
+        # return (point, tangent)
+        pass
 
     # !!!*** Need API to provide points for a wire segment to do the splitting,
     # Need to connect the wire segment to the domain boundary
