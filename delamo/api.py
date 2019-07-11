@@ -43,7 +43,6 @@ from delamo.OCCModelBuilder import OCCModelBuilder
 from delamo.layer import Layer as OCCLayer
 import delamo
 
-from delamo.autofiber.generator import AutoFiber
 
 
 #import delamo.CADwrap
@@ -1168,6 +1167,9 @@ layup direction, etc."""
     def CreateFiberObject(self, DM, point, fibervec, normal, mp, fiberint=1.0, angle_error=0.01, final_plotting=False):
         """ Utilize Autofiber orientation package to calculate optimal fiber orientations at each mesh
          element centroid. """
+
+        from delamo.autofiber.generator import AutoFiber
+
         self.orientation = AutoFiber(self.gk_layer.DMObj,
                                      point, fibervec, normal,
                                      materialproperties=(
