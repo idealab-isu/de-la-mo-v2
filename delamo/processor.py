@@ -202,10 +202,13 @@ def unwrap_loops(rb_tree):
             # iterator assignment
             toinsert.append(redbaron.AssignmentNode({
                 "first_formatting": [],
+                "annotation_first_formatting": [],
+                "annotation_second_formatting": [],
                 "operator": "",
                 "second_formatting": "",
                 "target": {"type":"name","value":iterator_var},
                 "type": "assignment",
+                "annotation": {},
                 "value": tupleentry.fst()}))
             
             # loop body
@@ -752,6 +755,13 @@ def substitute_function(rb_tree,fun_def,atomtrailers_nodematch):
         
         
         fc_parent.insert_multiple(index,rb_code)
+
+        #for code_el in rb_code:
+        #    fc_parent.insert(index,code_el.copy())
+        #    index+=1
+        #    pass
+
+
         #fc_parent.extend(rb_code)
         #for o in rb_code:
         #    fc_parent.insert(index,o);
@@ -759,10 +769,6 @@ def substitute_function(rb_tree,fun_def,atomtrailers_nodematch):
 
         
         
-        #for code_el in rb_code:
-        #    fc_parent.insert(index,code_el.copy())
-        #    index+=1
-        #    pass
         
         pass
     pass

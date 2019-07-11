@@ -30,7 +30,8 @@ import os
 # Initialize the DeLaMo model
 DM=DelamoModeler.Initialize(globals(),
                             pointtolerancefactor=100.0,
-                            normaltolerance=100e-4)
+                            normaltolerance=100e-4,
+                            GapWidth=0.0)
 
 # This script then generates both a CAD file and a Python script.
 # The Python script can be run from Abaqus. It includes the 
@@ -142,7 +143,7 @@ for layernum in range(16):
                        region=layer.singlepart.GetInstanceFaceRegion(FixedPoint,0.02))
 
     if previouslayer is not None:
-        bond_layers(DM,previouslayer, layer)
+        bond_layers(DM,previouslayer, layer, CohesiveInteraction=CohesiveInteraction, ContactInteraction=ContactInteraction)
         pass
 
     # mold for next layer

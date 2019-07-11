@@ -17,6 +17,8 @@ import os.path
 import glob
 import re
 import numpy as np
+import scipy 
+import scipy.spatial
 
 
 # Set layer thickness for lamina
@@ -52,8 +54,18 @@ for damage_filename in damage_filenames:
 
     delam_depth = delam_layernum*thickness
 
-    delam_coords = np.array((delam_outline_raw[1,:],delam_outline_raw[2,:],np.ones(delam_outline_raw.shape[1],dtype='d')*delam_depth),dtype='d')
+    delam_coords = np.array((delam_outline_raw[1,:],delam_outline_raw[2,:]),dtype='d') # ,np.ones(delam_outline_raw.shape[1],dtype='d')*delam_depth)
+
+    # This next bit of code converts an array of points inside the delaminated region to the delamination outline. It assumes the delamination is convex, which is true for the data of this example.
+    delam_qhull = scipy.spatial.ConvexHull(delam_coords.T)
+    delam_hull_outline = np.array((delam_coords[0,delam_qhull.vertices],delam_coords[1,delam_qhull.vertices],np.ones(delam_qhull.vertices.shape[0],dtype='d')*delam_depth),dtype='d')
     
+    delam_hull_outline_closed=np.concatenate((delam_hull_outline,delam_hull_outline[:,0:1]),axis=1)
+
+    # The outlines seem to have x and y swapped relative to the CAD model. This fixes the outlines
+    delam_hull_outline_closed_swapxy=np.concatenate((delam_hull_outline_closed[1:2,:],delam_hull_outline_closed[0:1,:],delam_hull_outline_closed[2:3,:]),axis=0)
+    
+
     linenumber = linenumbers[int(delam_layernum)-1] # line number of bond_layers call
 
     
@@ -61,6 +73,6 @@ for damage_filename in damage_filenames:
     
     delamcounts[int(delam_layernum)-1] += 1
 
-    np.savetxt(csvfilename,delam_coords.T,delimiter=", ")
+    np.savetxt(csvfilename,delam_hull_outline_closed_swapxy.T,delimiter=", ")
     
     pass
