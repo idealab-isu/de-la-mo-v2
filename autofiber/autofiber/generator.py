@@ -186,7 +186,7 @@ class AutoFiber:
             # print("Loading %s data type." % self.cadfile.__class__.__name__)
             if self.cadfile.__class__.__name__ is "DMObject":
                 self.objframe = coordframe()
-                self.obj = ndepart.fromobject(self.objframe, None, self.cadfile, recalcnormals=False, tol=1e-6)
+                self.obj = ndepart.fromDMobject(self.objframe, None, self.cadfile, recalcnormals=False, tol=1e-6)
             else:
                 raise Exception("Unsupported object type.")
         else:
