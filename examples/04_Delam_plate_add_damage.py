@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import os.path
 import glob
@@ -21,10 +22,11 @@ import scipy
 import scipy.spatial
 
 
+doplots = False
+
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 04_Delam_plate.py ***
 thickness = 0.130
-
 
 damage_directory = os.path.join("..","data","TRI_delams")
 output_directory = "04_Delam_plate_output"
@@ -37,6 +39,12 @@ linenumbers = [ int(re.match(r"""layerboundary_PREDAMAGE_([0-9]+)[.]stl""",os.pa
 linenumbers.sort()
 
 delamcounts = np.ones(len(linenumbers),dtype=np.uint32)
+
+if doplots:
+    from matplotlib import pyplot as pl
+    pass
+
+legends={}
 
 damage_filenames = glob.glob(os.path.join(damage_directory,"*.npz"))
 for damage_filename in damage_filenames:
@@ -71,8 +79,35 @@ for damage_filename in damage_filenames:
     
     csvfilename = os.path.join(output_directory,"layerdelam_%5.5d_%2.2d.csv" % (linenumber,delamcounts[int(delam_layernum)-1]))
     
+    # !!!!*** Temporary ignore all delams after the first in each layer because they all overlap
+    if delamcounts[int(delam_layernum)-1] > 1:
+        continue
+    
     delamcounts[int(delam_layernum)-1] += 1
 
-    np.savetxt(csvfilename,delam_hull_outline_closed_swapxy.T,delimiter=", ")
     
+
+    np.savetxt(csvfilename,delam_hull_outline_closed_swapxy.T,delimiter=", ")
+
+
+    if doplots:
+        pl.figure(delam_layernum)
+        pl.plot(delam_hull_outline_closed_swapxy[0,:],delam_hull_outline_closed_swapxy[1,:],'-')
+        pl.xlabel('X position (mm)')
+        pl.ylabel('Y position (mm)')
+        pl.title('Layer boundary #%d' % (delam_layernum))
+        oldlegends=[]
+        if delam_layernum in legends:
+            oldlegends=copy.copy(legends[delam_layernum])
+            pass
+        oldlegends.append(os.path.split(damage_filename)[1])
+        pl.legend(oldlegends)
+        legends[delam_layernum]=oldlegends
+        
+        pass
+    
+    pass
+
+if doplots:
+    pl.show()
     pass
