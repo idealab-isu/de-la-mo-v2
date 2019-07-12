@@ -306,7 +306,7 @@ FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
 layer1.singlepart.fe_part.Surface(name="ForceSurface",
                                   side1Faces=layer1.singlepart.GetPartFace((-49.0, -49.0, thickness * 0), 0.1))
 
-ForceVector = [0.0, 0.0, -5e-2]  # Units of MPa
+ForceVector = [0.0, 0.0, -2e-2]  # Units of MPa
 
 # Call ABAQUS SurfaceTraction method
 # Again, this came from looking at ABAQUS replay (.rpy) output

@@ -30,7 +30,8 @@ import os
 # Initialize the DeLaMo model
 DM=DelamoModeler.Initialize(globals(),
                             pointtolerancefactor=100.0,
-                            normaltolerance=100e-4)
+                            normaltolerance=100e-4,
+                            GapWidth=0.0)
 
 # This script then generates both a CAD file and a Python script.
 # The Python script can be run from Abaqus. It includes the 
@@ -308,7 +309,7 @@ layer1.singlepart.fe_part.Surface(name="ForceSurface",
                                   side1Faces=layer1.singlepart.GetPartFace((-49.0,-49.0,thickness*0),0.1))
 
 
-ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa 
+ForceVector=[ 0.0, 0.0, -2e-2 ] # Units of MPa 
 
 # Call ABAQUS SurfaceTraction method
 # Again, this came from looking at ABAQUS replay (.rpy) output
