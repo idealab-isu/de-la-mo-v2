@@ -15,6 +15,7 @@
 
 import sys
 import copy
+import time
 import os.path
 import csv
 import numpy as np
@@ -1024,9 +1025,31 @@ class OCCModelBuilder(object):
         for ToolShape in ToolShapes:
             GASplitter.AddTool(ToolShape[0])
             pass
+
+        # This commented-out code is used to time and record the parameters
+        # to the calls to the splitter, which seem to take a fraction
+        # of a second for example 1 where the underlying layer is a
+        # single piece, but about a minute each in example 2 where the
+        # delamination crosses the body (fiber breakage) boundary (!)
+        
+        #global splittercall
+        #if not "splittercall" in globals():
+        #    splittercall=0
+        #    pass
+        #print("splitter call #%d" % (splittercall))
+        #
+        #breptools_Write(layerbodyface.Face,'/tmp/splitcall%d_face.brep' % (splittercall))
+        #for ToolShapeNum in range(len(ToolShapes)):
+        #    breptools_Write(ToolShapes[ToolShapeNum][0],'/tmp/splitcall%d_tool%d.brep' % (splittercall,ToolShapeNum))
+        #    pass
+        #starttime=time.clock()
         
         GASplitter.Perform()
-
+        #elapsed=time.clock()-starttime
+        #print("splitter call #%d took %f seconds" % (splittercall,elapsed))
+        
+        #splittercall += 1
+        
         #if (not GASplitter.IsDone()):
         #    raise ValueError("Splitting face failed\n")
 
