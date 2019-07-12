@@ -163,7 +163,7 @@ layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSI
 bond_layers(DM,layer2, layer3, defaultBC="COHESIVE",
             CohesiveInteraction=CohesiveInteraction,
             ContactInteraction=ContactInteraction,
-            delaminationlist= [ "../data/nasa-delam12-1.csv" ])
+            delaminationlist= [ "../data/nasa-delam12-1.csv" ],master_layer=layer3)
             
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
@@ -180,7 +180,7 @@ layer4 = Layer.CreateFromMold(DM,layer3.gk_layer.OffsetMold(),"OFFSET",thickness
 layer4.Finalize(DM)
 layer4.MeshSimple(MeshElemTypes,meshsize/2.0,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
-bond_layers(DM,layer3, layer4,master_layer=layer3)
+bond_layers(DM,layer3, layer4,master_layer=layer3, defaultBC="COHESIVE",CohesiveInteraction=CohesiveInteraction)
 
 # Update and add point marker for fixed faced boundary condition
 FixedPoint[2]+=thickness
@@ -254,7 +254,7 @@ layer1.singlepart.fe_part.Surface(name="ForceSurface",
                                   side1Faces=layer1.singlepart.GetPartFace((-49.0,-49.0,thickness*0),0.1))
 
 
-ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa 
+ForceVector=[ 0.0, 0.0, -.5e-2 ] # Units of MPa 
 
 # Call ABAQUS SurfaceTraction method
 # Again, this came from looking at ABAQUS replay (.rpy) output

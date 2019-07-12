@@ -1458,10 +1458,8 @@ storage of the various tie/contact/cohesive objects tying the two layers togethe
         # topsurface=Laminate.Surface(name="%sTop" % (self.toplamina.partname),side1Faces=topfaces)
         # bottomsurface=Laminate.Surface(name="%sBottom" % (self.bottomlamina.partname),side1Faces=bottmfaces)
         
-        if master is None:
-            topregion=self.DM.regionToolset.Region(side1Faces=topface)
-            bottomregion=self.DM.regionToolset.Region(side1Faces=bottomface)
-            pass
+        topregion=self.DM.regionToolset.Region(side1Faces=topface)
+        bottomregion=self.DM.regionToolset.Region(side1Faces=bottomface)
         
         
         nameindex="LaminaContact_%s_%s_Contact_%d" % (top_laminapart.name,bottom_laminapart.name,self.DM.get_unique())
@@ -1774,7 +1772,6 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         DM.modelbuilder.apply_delaminations(layer1.gk_layer,layer2.gk_layer,delaminationlist)
         pass
     
-
     face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
     
 

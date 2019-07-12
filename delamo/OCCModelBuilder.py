@@ -1281,7 +1281,8 @@ class OCCModelBuilder(object):
                     if BCType is None: # BCType not otherwise set... insert default
                         BCType="TIE"
                         pass
-                    elif bc_map is not None:
+
+                    if bc_map is not None:
                         # apply user-supplied BC mapping
                         BCType=bc_map[BCType]
                         pass
