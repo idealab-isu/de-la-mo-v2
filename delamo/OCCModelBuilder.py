@@ -908,6 +908,9 @@ class OCCModelBuilder(object):
         if len(delam_outlines)==0:
             return # nothing to do if there are no delaminations
 
+        # Offset Face in both directions to create new faces for projection
+        (bounding_face_a,bounding_face_b) = self.OffsetFaceInBothDirections(layerbodyface.Face)
+        
         ToolShapes=[]
         
         for delam_outline in delam_outlines:
@@ -950,8 +953,6 @@ class OCCModelBuilder(object):
                pass
             edge_edges = [ topods_Edge(edge_shape) for edge_shape in edge_shapes ]
 
-            # Offset Face in both directions to create new faces for projection
-            (bounding_face_a,bounding_face_b) = self.OffsetFaceInBothDirections(layerbodyface.Face)
             
             ProjectionEdges_a = self.ProjectEdgesOntoFace(edge_edges,bounding_face_a)
             ProjectionEdges_b = self.ProjectEdgesOntoFace(edge_edges,bounding_face_b)
