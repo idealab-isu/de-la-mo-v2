@@ -34,6 +34,7 @@ from OCC.TopoDS import TopoDS_Solid
 from OCC.TopoDS import topods_Shell
 from OCC.TopoDS import topods_Face
 from OCC.TopoDS import topods_Edge
+from OCC.TopoDS import topods_Vertex
 from OCC.BRep import BRep_Builder
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
@@ -1258,50 +1259,73 @@ class LayerBody(object):
         # return an edge along the offset direction (between ORIG and OFFSET faces)
         # return (point, tangent)
 
-        # Choose the first side face and intersect it with any other adjacent face.
-        # Find the intersection edge
-        # Evaluate midpoint and tangent
+        # If there are more than 1 side faces, then perform an intersection
+        # if not, go through the face edges and choose the edge that is along the offset direction
+        if (len(self.FaceListSide) > 1):
+            # Choose the first side face and intersect it with any other adjacent face.
+            # Find the intersection edge
+            # Evaluate midpoint and tangent
+            sideFace1 = self.FaceListSide[0].Face
 
-        sideFace1 = self.FaceListSide[0].Face
+            for side in range(1,len(self.FaceListSide)):
+                sideFace2 =  self.FaceListSide[side].Face
 
-        for side in range(1,len(self.FaceListSide)):
-            sideFace2 =  self.FaceListSide[side].Face
+                section = BRepAlgoAPI_Section(sideFace1, sideFace2)
+                section.Build()
 
-            section = BRepAlgoAPI_Section(sideFace1, sideFace2)
-            section.Build()
+                # sectionCompoundEdges is a compound shape
+                # Need to iterate and get all edges
 
-            # sectionCompoundEdges is a compound shape
-            # Need to iterate and get all edges
+                if section.IsDone():
+                    sectionCompoundEdges = section.Shape()
+                else:
+                    raise ValueError("Could not compute Section!")
 
-            if section.IsDone():
-                sectionCompoundEdges = section.Shape()
-            else:
-                raise ValueError("Could not compute Section!")
+                exp = TopExp_Explorer(sectionCompoundEdges, TopAbs_EDGE)
 
-            exp = TopExp_Explorer(sectionCompoundEdges, TopAbs_EDGE)
+                # Iterate over all edges
+                # return a list of edges
 
-            # Iterate over all edges
-            # return a list of edges
+                edge_list = []
+                while exp.More():
+                    current_edge = topods_Edge(exp.Current())
+                    edge_list.append(current_edge)
+                    exp.Next()
+                    pass
 
-            edge_list = []
-            while exp.More():
-                current_edge = topods_Edge(exp.Current())
-                edge_list.append(current_edge)
-                exp.Next()
-                pass
+                if (len(edge_list) == 0):
+                    continue
 
-            if (len(edge_list) == 0):
-                continue
+                assert(len(edge_list) == 1)
 
-            assert(len(edge_list) == 1)
+                intersection_edge = edge_list[0]
+                (intersection_curve, start, end) = BRep_Tool().Curve(intersection_edge)  # Handle_Geom_Curve
+                #point = intersection_curve.GetObject().Value((start + end)*0.5) # gp_Pnt
+                point = gp_Pnt()
+                tangent = gp_Vec()
+                intersection_curve.GetObject().D1((start + end)*0.5, point, tangent)
+                break
+        else:
+            # Only one side face
+            EdgeExplorer = TopExp_Explorer(self.FaceListSide[0].Face, TopAbs_EDGE)
+            # Iterate over all faces, creating LayerBodyFaces
+            while EdgeExplorer.More():
+                edge = topods_Edge(EdgeExplorer.Current())
+                VertexExplorer = TopExp_Explorer(edge, TopAbs_VERTEX)
+                vertex1 = topods_Vertex(VertexExplorer.Current())
+                VertexExplorer.Next()
+                vertex2 = topods_Vertex(VertexExplorer.Current())
 
-            intersection_edge = edge_list[0]
-            (intersection_curve, start, end) = BRep_Tool().Curve(intersection_edge)  # Handle_Geom_Curve
-            #point = intersection_curve.GetObject().Value((start + end)*0.5) # gp_Pnt
-            point = gp_Pnt()
-            tangent = gp_Vec()
-            intersection_curve.GetObject().D1((start + end)*0.5, point, tangent)
-            break
+                if (not vertex1.IsSame(vertex2)):
+                    (intersection_curve, start, end) = BRep_Tool().Curve(edge)  # Handle_Geom_Curve
+                    # point = intersection_curve.GetObject().Value((start + end)*0.5) # gp_Pnt
+                    point = gp_Pnt()
+                    tangent = gp_Vec()
+                    intersection_curve.GetObject().D1((start + end) * 0.5, point, tangent)
+                    break
+
+                EdgeExplorer.Next()
+            pass
 
         return (np.array((point.X(),point.Y(),point.Z()),dtype='d'),np.array((tangent.X(),tangent.Y(),tangent.Z()),dtype='d'))
 
