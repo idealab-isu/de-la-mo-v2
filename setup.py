@@ -26,6 +26,7 @@ from distutils.core import setup
 
 setup(name="delamo",
       description="De-la-mo v2",
+      version=2.0,
       author="Adarsh Krisnamurthy, Stephen D. Holland",
       url="http://thermal.cnde.iastate.edu/de-la-mo.xhtml",
       #ext_modules=[],
