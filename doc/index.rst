@@ -103,10 +103,10 @@ Installation
 ============
 
 Be sure the prerequisite components (listed under Requirements, above)
-are installed. Download or clone the `De-la-mo-v2 <https://git.linux.iastate.edu/NASA-AK/de-la-mo-v2>`_ source tree. Then
+are installed. Download or clone the `De-la-mo-v2 <https://github.com/idealab-isu/de-la-mo-v2>`_ source tree. Then
 execute the following in the root directory of the de-la-mo source tree::
 
-   git clone https://git.linux.iastate.edu/NASA-AK/de-la-mo-v2
+   git clone https://github.com/idealab-isu/de-la-mo-v2
    cd de-la-mo-v2/
    python setup.py build
    python setup.py install
