@@ -77,6 +77,8 @@ from OCC.TColgp import TColgp_Array1OfPnt
 from OCC.TColgp import TColgp_HArray1OfPnt
 from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
 from OCC.BRepAlgoAPI import BRepAlgoAPI_Section
+from OCC.GProp import GProp_GProps
+from OCC.BRepGProp import brepgprop_SurfaceProperties
 
 from OCC.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Bnd import Bnd_Box
@@ -1464,9 +1466,97 @@ class LayerMold(object):
         return cls(Direction=Direction,
                    Shape=Shell,
                    FaceList=FaceList)
-        
 
-    
+    @classmethod
+    def CutMoldFromShell(cls, shellfilename, toolfilename, OrigDirPoint=np.array((0.0, 0.0, 0.0)), OrigDirNormal=np.array((0.0, 0.0, 1.0)),
+                 OrigDirTolerance=1e-6):
+        """Create a LayerMold from a STEP, IGES, or BREP file and cut the mold using the tool
+        The LayerMold containing a surface. OrigDirPoint and OrigDirNormal
+        are used to define the "ORIG" direction. The closest point
+        on the surface to OrigDirPoint is found. The ORIG direction
+        is the side of the surface with positive component in the
+        OrigDirNormal direction.
+        """
+
+        ShellShapes = loaders.load_byfilename(shellfilename)
+        ToolShapes = loaders.load_byfilename(toolfilename)
+
+        ShellExp = TopExp_Explorer(ShellShapes, TopAbs_SHELL)
+        # Iterate over all shells
+        ShellList = []
+        while ShellExp.More():
+            CurrentShellShape = ShellExp.Current()
+            if CurrentShellShape.ShapeType() != TopAbs_SHELL:
+                raise ValueError("File %s type is %s, not TopAbs_SHELL" % (shellfilename, str(CurrentShellShape.ShapeType)))
+            ShellList.append(CurrentShellShape)
+            ShellExp.Next()
+
+        if (len(ShellList) > 1):
+            raise ValueError("File %s contains more than one TopAbs_SHELL" % (shellfilename))
+        ShellShape = ShellList[0]
+
+        ToolExp = TopExp_Explorer(ToolShapes, TopAbs_SHELL)
+        # Iterate over all shells
+        ToolList = []
+        while ToolExp.More():
+            CurrentToolShape = ToolExp.Current()
+            if CurrentToolShape.ShapeType() != TopAbs_SHELL:
+                raise ValueError("File %s type is %s, not TopAbs_SHELL" % (shellfilename, str(CurrentToolShape.ShapeType)))
+            ToolList.append(CurrentToolShape)
+            ToolExp.Next()
+
+        if (len(ToolList) > 1):
+            raise ValueError("File %s contains more than one TopAbs_SHELL" % (shellfilename))
+
+        ToolShape = ToolList[0]
+
+        GASplitter = GEOMAlgo_Splitter()
+        GASplitter.AddArgument(ShellShape)
+        GASplitter.AddTool(ToolShape)
+        GASplitter.Perform()
+
+        SplitShells = GASplitter.Shape()
+
+        SplitFaceExp = TopExp_Explorer(SplitShells, TopAbs_FACE)
+        # Iterate over all shells
+        SplitFaceList = []
+        while SplitFaceExp.More():
+            CurrentShellShape = SplitFaceExp.Current()
+            SplitFaceList.append(CurrentShellShape)
+            SplitFaceExp.Next()
+
+        GProps1 = GProp_GProps()
+        brepgprop_SurfaceProperties(SplitFaceList[0], GProps1)
+        SurfArea1 = GProps1.Mass()
+
+        GProps2 = GProp_GProps()
+        brepgprop_SurfaceProperties(SplitFaceList[1], GProps2)
+        SurfArea2 = GProps2.Mass()
+
+        if SurfArea1 > SurfArea2:
+            ShellModel = SplitFaceList[0]
+            MoldShape = SplitFaceList[1]
+            pass
+        else:
+            ShellModel = SplitFaceList[1]
+            MoldShape = SplitFaceList[0]
+            pass
+
+        Name = os.path.splitext(os.path.split(shellfilename)[1])[0]  # Based on filename with no extension
+        # Owner = None
+
+        step_writer=STEPControl_Writer()
+        step_writer.Transfer(MoldShape,STEPControl_ShellBasedSurfaceModel,True)
+        #step_writer.Transfer(ShellModel,STEPControl_ShellBasedSurfaceModel,True)
+        step_writer.Write("../data/SplitShell.STEP")
+        #
+        # sys.modules["__main__"].__dict__.update(globals())
+        # sys.modules["__main__"].__dict__.update(locals())
+        # raise ValueError("Break")
+
+
+        return [cls.FromShell(topods_Face(MoldShape), OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
+
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):
         """Create a LayerMold from a STEP, IGES, or BREP file 

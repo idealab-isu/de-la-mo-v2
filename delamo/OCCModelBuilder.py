@@ -419,7 +419,8 @@ class OCCModelBuilder(object):
         
         # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
 
-        Projections = [ GeomProjLib.geomprojlib_Project(edge_curve[0],surface) for edge_curve in edge_curves ] # If this fails with a RunTimeError, it probably means that your delamination outline does not project down onto the layer
+        Projections = [ GeomProjLib.geomprojlib_Project(edge_curve[0],surface) for edge_curve in edge_curves ]
+        # If this fails with a RunTimeError, it probably means that your delamination outline does not project down onto the layer
 
         # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
         # But it's probably OK not to, because we are using the projection to make a tool that will be used to cut the face
