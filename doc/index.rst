@@ -103,10 +103,10 @@ Installation
 ============
 
 Be sure the prerequisite components (listed under Requirements, above)
-are installed. Download or clone the `De-la-mo-v2 <https://git.linux.iastate.edu/NASA-AK/de-la-mo-v2>`_ source tree. Then
+are installed. Download or clone the `De-la-mo-v2 <https://github.com/idealab-isu/de-la-mo-v2>`_ source tree. Then
 execute the following in the root directory of the de-la-mo source tree::
 
-   git clone https://git.linux.iastate.edu/NASA-AK/de-la-mo-v2
+   git clone https://github.com/idealab-isu/de-la-mo-v2
    cd de-la-mo-v2/
    python setup.py build
    python setup.py install
@@ -124,12 +124,12 @@ the installation will place it into your path, such as into
 /opt/bin or /usr/local/bin e.g.::
 
   cd examples/
-  delamo_process 01_Planar_Single_Delam.py
+  delamo_process 01_Curved_Single_Delam.py
 
 On Windows you may need to explicitly call the python interpreter from
 a command prompt::
 
-  python c:\delamo\scripts\delamo_process c:\delamo\examples\01_Planar_Single_Delam.py
+  python c:\de-la-mo-v2\scripts\delamo_process c:\de-la-mo-v2\examples\01_Curved_Single_Delam.py
 
 The delamo_process program will list the processing steps used by your
 specified example script, and give you the option to execute
@@ -161,34 +161,144 @@ in ABAQUS.
 To test your De-la-mo installation, type "BM 1" and press <ENTER>.
 If your De-la-mo installation is working properly, you should see output
 similar to the following::
-  
-  /usr/bin/python 01_Planar_Single_Delam.py
-  Face adjacency: Layer Layer_1 and Layer Layer_2:
-      Tie, Body Layer_1LB0 to Layer_2LB0
-  Face adjacency: Layer Layer_2 and Layer Layer_3:
-      Contact, Body Layer_2LB0 to Layer_3LB0
-      Nomodel, Body Layer_2LB0 to Layer_3LB0
-      Cohesive, Body Layer_2LB0 to Layer_3LB0
-  Face adjacency: Layer Layer_3 and Layer Layer_4:
-      Tie, Body Layer_3LB0 to Layer_4LB0
-  Face adjacency: Layer Layer_4 and Layer Layer_5:
-      Tie, Body Layer_4LB0 to Layer_5LB0
-  Face adjacency: Layer Layer_5 and Layer Layer_6:
-      Tie, Body Layer_5LB0 to Layer_6LB0
-  Face adjacency: Layer Layer_6 and Layer Layer_7:
-      Tie, Body Layer_6LB0 to Layer_7LB0
-  Face adjacency: Layer Layer_7 and Layer Layer_8:
-      Tie, Body Layer_7LB0 to Layer_8LB0
-  Added Layer_1LB0 to the save list.
-  Added Layer_2LB0 to the save list.
-  Added Layer_3LB0 to the save list.
-  Added Layer_4LB0 to the save list.
-  Added Layer_5LB0 to the save list.
-  Added Layer_6LB0 to the save list.
-  Added Layer_7LB0 to the save list.
-  Added Layer_8LB0 to the save list.
-  Saved 8 bodies.
-  SUCCESS: Saved SAT file!
+
+   /usr/bin/python 01_Curved_Single_Delam.py
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 70.71858352562738
+   Maximum edge length in object : 50.01168296459883
+   Object refined with 148 triangles added.
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 71.00322297429167
+   Maximum edge length in object : 50.011690719163205
+   Object refined with 148 triangles added.
+   Appending to FAL: {'point1': array([-40.        ,  45.02485271,   0.59479578]), 'bcType': 'TIE', 'name2': 'Layer_2_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_1_LB1'}
+   Face adjacency: Layer Layer_1 and Layer Layer_2:
+       Tie, Body Layer_1_LB1 to Layer_2_LB1
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 71.28839257420735
+   Maximum edge length in object : 50.01169847629936
+   Object refined with 148 triangles added.
+   Curve parameter range : 0.000000 to 49.544059
+   Minimum curvature of the delamination outline is : 0.843951
+   Created reference face
+   Created reference face
+   Number of split faces 3
+   Removing original face from offset side
+   Curve parameter range : 0.000000 to 49.544059
+   Minimum curvature of the delamination outline is : 0.843951
+   Created reference face
+   Created reference face
+   Number of split faces 3
+   Removing original face from orig side
+   Appending to FAL: {'point1': array([-40.        ,  45.03978131,   0.79323503]), 'bcType': 'COHESIVE', 'name2': 'Layer_3_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_2_LB1'}
+   Appending to FAL: {'point1': array([-5.32020331, -5.20985343,  2.46235983]), 'bcType': 'NONE', 'name2': 'Layer_3_LB1', 'normal1': array([ 0.        , -0.00867736,  0.99996235]), 'name1': 'Layer_2_LB1'}
+   Appending to FAL: {'point1': array([-5.14954522, -5.45657412,  2.46016817]), 'bcType': 'CONTACT', 'name2': 'Layer_3_LB1', 'normal1': array([ 0.       , -0.0090883,  0.9999587]), 'name1': 'Layer_2_LB1'}
+   Face adjacency: Layer Layer_2 and Layer Layer_3:
+       Cohesive, Body Layer_2_LB1 to Layer_3_LB1
+       Nomodel, Body Layer_2_LB1 to Layer_3_LB1
+       Contact, Body Layer_2_LB1 to Layer_3_LB1
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 71.57408584740445
+   Maximum edge length in object : 50.0117062360073
+   Object refined with 148 triangles added.
+   Appending to FAL: {'point1': array([-40.        ,  45.05470992,   0.99167429]), 'bcType': 'TIE', 'name2': 'Layer_4_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_3_LB1'}
+   Face adjacency: Layer Layer_3 and Layer Layer_4:
+       Tie, Body Layer_3_LB1 to Layer_4_LB1
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 71.86029654801696
+   Maximum edge length in object : 50.01171399828704
+   Object refined with 148 triangles added.
+   Appending to FAL: {'point1': array([-40.        ,  45.06963852,   1.19011354]), 'bcType': 'TIE', 'name2': 'Layer_5_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_4_LB1'}
+   Face adjacency: Layer Layer_4 and Layer Layer_5:
+       Tie, Body Layer_4_LB1 to Layer_5_LB1
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 72.14701851806669
+   Maximum edge length in object : 50.01172176313855
+   Object refined with 148 triangles added.
+   Appending to FAL: {'point1': array([-40.        ,  45.08456712,   1.38855279]), 'bcType': 'TIE', 'name2': 'Layer_6_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_5_LB1'}
+   Face adjacency: Layer Layer_5 and Layer Layer_6:
+       Tie, Body Layer_5_LB1 to Layer_6_LB1
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 72.43424568616408
+   Maximum edge length in object : 50.01172953056185
+   Object refined with 148 triangles added.
+   Appending to FAL: {'point1': array([-40.        ,  45.09949573,   1.58699204]), 'bcType': 'TIE', 'name2': 'Layer_7_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_6_LB1'}
+   Face adjacency: Layer Layer_6 and Layer Layer_7:
+       Tie, Body Layer_6_LB1 to Layer_7_LB1
+   Face 0 triangulated with 76 triangles.
+
+   Maximum edge length set       : 72.7219720662256
+   Maximum edge length in object : 50.01173730089336
+   Object refined with 148 triangles added.
+   Appending to FAL: {'point1': array([-40.        ,  45.11442433,   1.7854313 ]), 'bcType': 'TIE', 'name2': 'Layer_8_LB1', 'normal1': array([-0.        ,  0.07501811,  0.99718217]), 'name1': 'Layer_7_LB1'}
+   Face adjacency: Layer Layer_7 and Layer Layer_8:
+       Tie, Body Layer_7_LB1 to Layer_8_LB1
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+
+   *******************************************************************
+   ******        Statistics on Transfer (Write)                 ******
+
+   *******************************************************************
+   ******        Transfer Mode = 3  I.E.  Manifold Solid       ******
+   ******        Transferring Shape, ShapeType = 2                      ******
+   ** WorkSession : Sending all data
+   Step File Name : 01_Curved_Single_Delam_output/01_Curved_Single_Delam_ORIGINAL.step(17633 ents)  Write  Done
+
 
 If the output you see contains error messages or is not similar to the above, troubleshoot the errors. The most likely problems are:
 * Wrong Python version or Python installation being used
@@ -197,9 +307,9 @@ See the troubleshooting section below for more help. You can also
 try running the De-la-mo script directly with your Python interpreter.
 
 If the build model step ran successfully, then it will have
-created an output directory 01_Planar_Single_Delam_output/
-containing an ABAQUS script 01_Planar_Single_Delam_ORIGINAL_abq.py and
-a CAD model 01_Planar_Single_Delam_ORIGINAL.sat
+created an output directory 01_Curved_Single_Delam_output/
+containing an ABAQUS script 01_Curved_Single_Delam_ORIGINAL_abq.py and
+a CAD model 01_Curved_Single_Delam_ORIGINAL.step
 
 The "FEINTERACT 1" command within delamo_process will run ABAQUS/CAE on
 this script and CAD model. Alternatively you can run the script from the
@@ -326,7 +436,7 @@ generated replay (abaqus.rpy) text file. For example,
 if you run ABAQUS/CAE, then create a material and section, and look in
 the abaqus.rpy file you will find something similar to
 (below boilerplate at the top)::
-  
+
   Mdb()
   #: A new model database has been created.
   #: The model "Model-1" has been created.
@@ -431,8 +541,8 @@ axis (which should be normal). The third axis is defined from the cross product:
 Material (i.e. fiber) directions will be specified relative to this coordinate system.
 In the current version of De-la-mo this coordinate system is the same everywhere within
 your De-la-mo model. De-la-mo contains functions that will utilize the fiber layup strategies
-employed by the `autofiber <https://github.com/nscheirer/autofiber>`_ python package. This dependency is included in the de-la-mo package but
-specific details on the method and a standalone package can be observed `here <https://github.com/nscheirer/autofiber>`_. De-la-mo
+employed by the `autofiber <https://github.com/idealab-isu/autofiber>`_ python package. This dependency is included in the de-la-mo package but
+specific details on the method and a standalone package can be observed `here <https://github.com/idealab-isu/autofiber>`_. De-la-mo
 will operate perfectly well without the AutoFiber library fiber layup methods but the fiber
 orientations defined by the coordsys is regarded as less accurate in certain curved model cases,
 especially doubly-curved surfaces. See example "05_Curved_Single_Delam_AutoFiber" to see how to incorporate
@@ -440,7 +550,7 @@ the AutoFiber orientations in the tutorial we are going through right now.
 
 Use a CAD package such as SolidWorks or Catia to create a mold surface.
 For example, the Mold surface can be created in SolidWorks using the freeform editor tool. You can first create a flat surface by extruding a line and make use of the freeform feature to change the shape of the surface. The following `tuturial <https://grabcad.com/tutorials/tutorial-for-beginners-how-to-free-form-surface-in-solidworks>`_ provides a detailed example of creating a free form surface in SolidWorks.
-Save the mold in ACIS (".sat") format. The mold can then be loaded into De-la-mo as follows::
+Save the mold in ".step" format. The mold can then be loaded into De-la-mo as follows::
 
    # Load a NURBS mold surface from a file
    Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
@@ -453,7 +563,7 @@ parameter to CreateFromMold()::
 This function performs an offsetting operation (similar to extrusion) of the specified thickness.
 It creates a De-la-mo layer object that wraps both an underlying geometry object and an underlying ABAQUS object.
 It applies the specified ABAQUS section (LaminaSection in this case) to the newly created layer.
-The third parameter must either be delamo.CADwrap.OFFSET_DIRECTION or delamo.CADwrap.ORIG_DIRECTION, which determines
+The third parameter must either be OFFSET or ORIG, which determines
 which the direction of the offsetting (the easiest way to pick the direction is to try an extrusion with a large amount of thickness
 and see if it extruded the wrong way). 
 
@@ -532,7 +642,7 @@ Now we can create a third layer, this time at +45 degree orientation::
    layer3.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
 
 This time, let us bond but with a delamination. We will specify
-defaultBC to be delamo.CADwrap.BC_COHESIVE, which overrides the
+defaultBC to be COHESIVE, which overrides the
 surrounding to use a cohesive boundary condition. As a result we also
 need to specify the ABAQUS interaction properties for the surrounding
 area (CohesiveInteraction) and the delaminated zone
@@ -709,7 +819,7 @@ The purpose of the APPLY_DAMAGE step is to run your script to determine
 those outlines. The name of your script for generating the damage outlines
 can be passed as a "apply_damage_script=" keyword parameter to
 process.output_filenames(). The PREDAMAGE step will have generated the
-.sat CAD model and a series of .stl layer boundaries. Each layer boundary
+.step CAD model and a series of .stl layer boundaries. Each layer boundary
 is named layerboundary_PREDAMAGE_yyyyy.stl where yyyyy is a positive
 integer that uniquely identifies the boundary (it happens to correspond
 to the line number of the call to bond_layers() in the PREDAMAGE script).
@@ -800,7 +910,7 @@ that triggered the problem, in this case line 3679 of 01_Curved_Single_Delam_ORI
 secondary importance. If we look at line 3679 and the comments immediately
 above, we see::
   
-  #  File "02_Curved_Single_Delam.py", line 124, in <module>
+  #  File "01_Curved_Single_Delam.py", line 124, in <module>
   #    region=layer1.singlepart.GetInstanceFaceRegion(FixedPoint,DM.pointtolerance))
   #  File "/usr/local/de-la-mo/delamo/api.py", line 558, in GetInstanceFaceRegion
   #    return self.DM.regionToolset.Region(faces=self.GetInstanceFace(surface_points,pointtolerance))
@@ -857,6 +967,39 @@ Proxy objects represent ABAQUS objects in the context of the De-La-Mo
 model builder. They record all operations performed on them, so those
 operations can be written to the output ABAQUS script.
 
+Updating AutoFiber
+==================
+Autofiber is a subpackage of De-la-mo, therefore we have implemented a subtree system for including the Autofiber
+package. See `here <https://git-scm.com/book/en/v1/Git-Tools-Subtree-Merging>`_ for more details. In order to update
+Autofiber run the following commands (make sure you are in the root directory of de-la-mo):
+
+If you have never updated Autofiber before you must add the relevant repository and branch as follows::
+
+   git remote add autofiber_remote https://github.com/idealab-isu/autofiber
+   git fetch autofiber_remote
+   git checkout -b autofiber_branch autofiber_remote/master
+
+Now you can switch between `master` (which contains de-la-mo) and `autofiber_branch` (which contains the autofiber
+package). We will need to tell git which directory autofiber is contained within like so::
+
+   git checkout master
+   git read-tree --prefix=autofiber/ -u autofiber_branch
+
+If git complains about the `read-tree` command then the directory may already be linked, especially if autofiber already exists, so you can continue.
+
+Now, if there is an update to autofiber we can switch to the autofiber branch and pull from autofiber_remote. Initially,
+you may need to commit the new autofiber package before you can merge or else the package might appear in a weird place.::
+
+   git checkout autofiber_branch
+   git pull
+
+Finally, we need to merge the autofiber branch with the de-la-mo branch as a subtree as follows::
+
+   git checkout master
+   git merge --squash --allow-unrelated-histories -s subtree --no-commit autofiber_branch
+
+The git merge command will pull in the autofiber branch while not preserving the history of autofiber and squashing any
+commits.
 
 Indices and tables
 ==================
