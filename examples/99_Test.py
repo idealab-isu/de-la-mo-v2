@@ -90,8 +90,11 @@ LaminateAssemblyMeshing=DM.meshinstrs.rewrapobj(LaminateAssembly)
 # Set layer thickness we are planning on using
 thickness = 0.199
 
+
+[Mold, Shell] = LayerMold.CutMoldFromShell(os.path.join("..","data","FlatShell.STEP"),os.path.join("..","data","CuttingTool2.STEP"))
+
 # Load a NURBS mold surface from a file
-Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
+#Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
 
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,
