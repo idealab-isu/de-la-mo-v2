@@ -664,6 +664,7 @@ class Layer(object):
         # Check for outline of original shape
         FreeCheck = ShapeAnalysis_FreeBoundsProperties(Mold.Shape)
         FreeCheck.Perform()
+        print("Mold has %d free boundaries." % (FreeCheck.NbClosedFreeBounds()))
         assert (FreeCheck.NbClosedFreeBounds() >= 1)
         
         # Build solid from original + offset
@@ -1545,17 +1546,22 @@ class LayerMold(object):
         Name = os.path.splitext(os.path.split(shellfilename)[1])[0]  # Based on filename with no extension
         # Owner = None
 
-        step_writer=STEPControl_Writer()
-        step_writer.Transfer(MoldShape,STEPControl_ShellBasedSurfaceModel,True)
-        #step_writer.Transfer(ShellModel,STEPControl_ShellBasedSurfaceModel,True)
-        step_writer.Write("../data/SplitShell.STEP")
+        # Create a shell from the face
+        shellBuilder = BRep_Builder()
+        MoldShell = TopoDS_Shell()
+        shellBuilder.MakeShell(MoldShell)
+        shellBuilder.Add(MoldShell, MoldShape)
+
+        # step_writer=STEPControl_Writer()
+        # step_writer.Transfer(MoldShell,STEPControl_ShellBasedSurfaceModel,True)
+        # #step_writer.Transfer(ShellModel,STEPControl_ShellBasedSurfaceModel,True)
+        # step_writer.Write("../data/SplitShell.STEP")
         #
         # sys.modules["__main__"].__dict__.update(globals())
         # sys.modules["__main__"].__dict__.update(locals())
         # raise ValueError("Break")
 
-
-        return [cls.FromShell(topods_Face(MoldShape), OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
+        return [cls.FromShell(topods_Shell(MoldShell), OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
 
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):
