@@ -50,6 +50,7 @@ from OCC import BRepBuilderAPI
 from OCC.BRepClass import BRepClass_FaceExplorer
 from OCC.BRepClass import BRepClass_FClassifier
 from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
+from OCC.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCC.ShapeAnalysis import ShapeAnalysis_Surface
 from OCC.BRepTools import breptools_Read
 from OCC.TopExp import TopExp_Explorer
@@ -662,11 +663,19 @@ class Layer(object):
         
 
         # Check for outline of original shape
+        # FreeBounds = ShapeAnalysis_FreeBounds(Mold.Shape)
+        # ClosedWires = FreeBounds.GetClosedWires()
+
         FreeCheck = ShapeAnalysis_FreeBoundsProperties(Mold.Shape)
         FreeCheck.Perform()
+
         print("Mold has %d free boundaries." % (FreeCheck.NbClosedFreeBounds()))
         assert (FreeCheck.NbClosedFreeBounds() >= 1)
-        
+
+        # sys.modules["__main__"].__dict__.update(globals())
+        # sys.modules["__main__"].__dict__.update(locals())
+        # raise ValueError("Break")
+
         # Build solid from original + offset
         bRepBuilder = BRep_Builder()
         perimeter = TopoDS_Compound()
@@ -1546,6 +1555,12 @@ class LayerMold(object):
         Name = os.path.splitext(os.path.split(shellfilename)[1])[0]  # Based on filename with no extension
         # Owner = None
 
+        # Create a compound face
+        # compoundBuilder = BRep_Builder()
+        # MoldCompound = TopoDS_Compound()
+        # compoundBuilder.MakeCompound(MoldCompound)
+        # compoundBuilder.Add(MoldCompound, MoldShape);
+
         # Create a shell from the face
         shellBuilder = BRep_Builder()
         MoldShell = TopoDS_Shell()
@@ -1561,7 +1576,7 @@ class LayerMold(object):
         # sys.modules["__main__"].__dict__.update(locals())
         # raise ValueError("Break")
 
-        return [cls.FromShell(topods_Shell(MoldShell), OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
+        return [cls.FromShell(MoldShell, OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
 
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):
