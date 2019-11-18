@@ -1437,8 +1437,12 @@ class LayerMold(object):
 
                     DistSupport = DistCalc.SupportOnShape1(1).ShapeType()
                     if DistSupport != TopAbs_FACE:
-                        raise ValueError("Nearest point on shell to selected point %s for determining ORIGINAL direction is a "
-                                         "vertex or and edge, not an interior point on the face. Select a different OrigDirPoint." % (str(OrigDirPoint)))
+                        # This test face found nearest point to be
+                        # an edge or a vertex, not inside the face
+                        # itself
+                        continue
+                        #raise ValueError("Nearest point on shell to selected point %s for determining ORIGINAL direction is a "
+                        #                 "vertex or and edge, not an interior point on the face. Select a different OrigDirPoint." % (str(OrigDirPoint)))
                     
                     (ClosestU,ClosestV)=DistCalc.ParOnFaceS1(1) # Evaluate (u,v) coordinates on this face of closest point
                     
@@ -1461,8 +1465,8 @@ class LayerMold(object):
 
         if OrigDirPoint is not None:
             if ClosestNormal is None:
-                raise ValueError("No closest point on loaded shape to vertex at %s" % (str(OrigDirPoint)))
-
+                raise ValueError("No closest point on loaded shape to vertex at %s. Try passing OrigDirPoint and OrigDirNormal parameters to specify the point where the ORIGINAL direction is defined." % (str(OrigDirPoint)))
+            
             
             NormalDir = ClosestNormal
             if np.dot(NormalDir,OrigDirNormal) < 0.0:
