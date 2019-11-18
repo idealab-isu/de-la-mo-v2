@@ -790,10 +790,9 @@ class Layer(object):
             # Search for this face in the mold
             MatchedInMold=False
             for MoldFace in Mold.FaceList: # Iterate over LayerBodyFaces in Mold
-                MoldFaceSurf=BRep_Tool.Surface(MoldFace.Face)
-                if MoldFaceSurf==FaceSurf: # Same underlying surface
-                    #if MatchedInMold:
-                    #    raise ValueError("Same surface matched twice in mold (!?)")  (this is actually OK)
+                if tds_Face.IsSame(MoldFace.Face):
+                    if MatchedInMold:
+                        raise ValueError("Same face matched twice in mold (!?)")  
                     MatchedInMold=True
                     pass
                 pass
@@ -802,10 +801,9 @@ class Layer(object):
             # Search for this face in the offset surface
             MatchedInOffset=False
             for OffsetFace in OffsetFaces: # Iterate over LayerBodyFaces in Mold
-                OffsetFaceSurf=BRep_Tool.Surface(OffsetFace)
-                if OffsetFaceSurf==FaceSurf: # Same underlying surface
+                if tds_Face.IsSame(OffsetFace): 
                     if MatchedInOffset:
-                        raise ValueError("Same surface matched twice in offset (!?)")
+                        raise ValueError("Same face matched twice in offset (!?)")
                     MatchedInOffset=True
                     pass
                 pass
@@ -1219,6 +1217,12 @@ class LayerBody(object):
                 tds_Face = topods_Face(FaceExp.Current())
                 FaceSurf = BRep_Tool.Surface(tds_Face)
 
+                # WARNING: This surface matching trick seems to be rather fragile
+                # ... in particular we have seen these surfaces never match
+                # when generated from a cutting operation. The symptom is you
+                # get only "side faces" out. A better solution is to use
+                # Face.IsSame() method, but that won't work here because the faces have been split
+                
                 # Search for this face in the mold
                 MatchedInOrig = False
                 for OrigFace in self.FaceListOrig:  # Iterate over LayerBodyFaces in pre-split LayerBody
