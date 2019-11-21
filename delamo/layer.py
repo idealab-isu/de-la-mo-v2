@@ -80,6 +80,7 @@ from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
 from OCC.BRepAlgoAPI import BRepAlgoAPI_Section
 from OCC.GProp import GProp_GProps
 from OCC.BRepGProp import brepgprop_SurfaceProperties
+from OCC.BRepGProp import brepgprop_VolumeProperties
 
 from OCC.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Bnd import Bnd_Box
@@ -1486,7 +1487,7 @@ class LayerMold(object):
                    FaceList=FaceList)
 
     @classmethod
-    def CutMoldFromShell(cls, shellfilename, toolfilename, OrigDirPoint=np.array((0.0, 0.0, 0.0)), OrigDirNormal=np.array((0.0, 0.0, 1.0)),
+    def CutMoldFromShell(cls, shellfilename, toolfilename, OrigDirPoint=np.array((0.0, 0.0, 0.0)), OrigDirNormal=np.array((0.0, 0.0, -1.0)),
                  OrigDirTolerance=1e-6):
         """Create a LayerMold from a STEP, IGES, or BREP file and cut the mold using the tool
         The LayerMold containing a surface. OrigDirPoint and OrigDirNormal
@@ -1574,6 +1575,104 @@ class LayerMold(object):
         MoldShell = TopoDS_Shell()
         shellBuilder.MakeShell(MoldShell)
         shellBuilder.Add(MoldShell, MoldShape)
+
+        # step_writer=STEPControl_Writer()
+        # step_writer.Transfer(MoldShell,STEPControl_ShellBasedSurfaceModel,True)
+        # #step_writer.Transfer(ShellModel,STEPControl_ShellBasedSurfaceModel,True)
+        # step_writer.Write("../data/SplitShell.STEP")
+        #
+        # sys.modules["__main__"].__dict__.update(globals())
+        # sys.modules["__main__"].__dict__.update(locals())
+        # raise ValueError("Break")
+
+        return [cls.FromShell(MoldShell, OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
+
+    @classmethod
+    def CutMoldFromSolid(cls, solidfilename, toolfilename, OrigDirPoint=np.array((0.0, 0.0, 0.0)), OrigDirNormal=np.array((0.0, 0.0, -1.0)),
+                 OrigDirTolerance=1e-6):
+        """Create a LayerMold from a STEP, IGES, or BREP file and cut the mold using the tool
+        The LayerMold containing a surface. OrigDirPoint and OrigDirNormal
+        are used to define the "ORIG" direction. The closest point
+        on the surface to OrigDirPoint is found. The ORIG direction
+        is the side of the surface with positive component in the
+        OrigDirNormal direction.
+        """
+
+        SolidShaoes = loaders.load_byfilename(solidfilename)
+        ToolShapes = loaders.load_byfilename(toolfilename)
+
+        SolidExp = TopExp_Explorer(SolidShaoes, TopAbs_SOLID)
+        # Iterate over all solids
+        SolidList = []
+        while SolidExp.More():
+            CurrentSolidShape = SolidExp.Current()
+            if CurrentSolidShape.ShapeType() != TopAbs_SOLID:
+                raise ValueError("File %s type is %s, not TopAbs_SOLID" % (solidfilename, str(CurrentSolidShape.ShapeType)))
+            SolidList.append(CurrentSolidShape)
+            SolidExp.Next()
+
+        if (len(SolidList) > 1):
+            raise ValueError("File %s contains more than one TopAbs_SOLID" % (solidfilename))
+        SolidShape = SolidList[0]
+
+        ToolExp = TopExp_Explorer(ToolShapes, TopAbs_SHELL)
+        # Iterate over all shells
+        ToolList = []
+        while ToolExp.More():
+            CurrentToolShape = ToolExp.Current()
+            if CurrentToolShape.ShapeType() != TopAbs_SHELL:
+                raise ValueError("File %s type is %s, not TopAbs_SHELL" % (shellfilename, str(CurrentToolShape.ShapeType)))
+            ToolList.append(CurrentToolShape)
+            ToolExp.Next()
+
+        if (len(ToolList) > 1):
+            raise ValueError("File %s contains more than one TopAbs_SHELL" % (shellfilename))
+
+        ToolShape = ToolList[0]
+
+        GASplitter = GEOMAlgo_Splitter()
+        GASplitter.AddArgument(SolidShape)
+        GASplitter.AddTool(ToolShape)
+        GASplitter.Perform()
+
+        SplitSolids = GASplitter.Shape()
+
+        SplitSolidExp = TopExp_Explorer(SplitSolids, TopAbs_SOLID)
+        # Iterate over all solids
+        SplitSolidList = []
+        while SplitSolidExp.More():
+            CurrentSolidShape = SplitSolidExp.Current()
+            SplitSolidList.append(CurrentSolidShape)
+            SplitSolidExp.Next()
+
+        GProps1 = GProp_GProps()
+        brepgprop_VolumeProperties(SplitSolidList[0], GProps1)
+        SurfArea1 = GProps1.Mass()
+
+        GProps2 = GProp_GProps()
+        brepgprop_VolumeProperties(SplitSolidList[1], GProps2)
+        SurfArea2 = GProps2.Mass()
+
+        if SurfArea1 > SurfArea2:
+            SolidModel = SplitSolidList[0]
+            LayerSolidModel = SplitSolidList[1]
+            pass
+        else:
+            SolidModel = SplitSolidList[1]
+            LayerSolidModel = SplitSolidList[0]
+            pass
+
+        # step_writer=STEPControl_Writer()
+        # # step_writer.Transfer(SolidModel,STEPControl_ManifoldSolidBrep,True)
+        # step_writer.Transfer(LayerSolidModel,STEPControl_ManifoldSolidBrep,True)
+        # step_writer.Write("../data/SplitSolid.STEP")
+
+
+        # Iterate through all the faces and identify the ORIG face based on the input
+        # point and normal. Extract the face and send as input to create the layer
+        # structure
+
+
 
         # step_writer=STEPControl_Writer()
         # step_writer.Transfer(MoldShell,STEPControl_ShellBasedSurfaceModel,True)

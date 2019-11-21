@@ -91,10 +91,13 @@ LaminateAssemblyMeshing=DM.meshinstrs.rewrapobj(LaminateAssembly)
 thickness = 0.199
 
 
-[Mold, Shell] = LayerMold.CutMoldFromShell(os.path.join("..","data","FlatShell.STEP"),os.path.join("..","data","CuttingTool2.STEP"))
+#[Mold, Shell] = LayerMold.CutMoldFromShell(os.path.join("..","data","FlatShell.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)))
+
+[Mold, Shell] = LayerMold.CutMoldFromSolid(os.path.join("..","data","FlatSolid.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)))
+
 
 # Load a NURBS mold surface from a file
-#Mold = LayerMold.FromFile(os.path.join("..","data","CurvedMold1.STEP"))
+#Mold = LayerMold.FromFile(os.path.join("..","data","Skin.STEP"))
 
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,
@@ -148,8 +151,8 @@ layer2.MeshSimple(MeshElemTypes,meshsize/1.8,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSI
 #bond_layers(DM,layer1, layer2)
 bond_layers(DM,layer1, layer2, defaultBC="COHESIVE",
             CohesiveInteraction=CohesiveInteraction,
-            ContactInteraction=ContactInteraction,
-            delaminationlist= [ "../data/nasa-delam12-1.csv", "../data/nasa-delam12-2.csv"  ])
+            ContactInteraction=ContactInteraction,)
+            #delaminationlist= [ "../data/nasa-delam12-1.csv", "../data/nasa-delam12-2.csv"  ])
 
 
 # Create 3rd layer
