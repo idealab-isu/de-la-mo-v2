@@ -92,7 +92,7 @@ from OCC.STEPControl import STEPControl_ManifoldSolidBrep
 from OCC.STEPControl import STEPControl_Writer,STEPControl_ShellBasedSurfaceModel,STEPControl_GeometricCurveSet
 
 from .layer import LayerBody,LayerBodyFace
-from .layer import OCCPointInFace
+from .tools import ProjectEdgesOntoFace,FindOCCPointNormal,SelectFaceByPointNormal,OCCPointInFace
 
 from . import loaders
 from . import layer
@@ -592,7 +592,7 @@ class OCCModelBuilder(object):
         while NoModel_split_exp.More():
             nomodel_split_face_shape = topods_Face(NoModel_split_exp.Current())
             
-            (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = layer.FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
+            (NoModel_Split_Point,NoModel_Split_Normal,NoModel_Split_ParPoint) = FindOCCPointNormal(nomodel_split_face_shape,self.PointTolerance,self.NormalTolerance)
             split_faces.append(nomodel_split_face_shape)
             
             # Debugging only
@@ -619,7 +619,7 @@ class OCCModelBuilder(object):
             #
             # end debugging
             
-            if (layer.OCCPointInFace((NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
+            if (OCCPointInFace((NoModel_Split_ParPoint[0]*parScale,NoModel_Split_ParPoint[1]*parScale,0.0),NoModelRefParamFace,self.PointTolerance) == TopAbs_IN):
                 # This particular nomodel_split_face is a contact zone.
                 BCTypes.append("CONTACT")
                 pass
@@ -667,7 +667,7 @@ class OCCModelBuilder(object):
             split_faces = [ topods_Face(split_face_shape) ]
             BCTypes= [ "TIE" ] # default
             
-            (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_faces[0],self.PointTolerance,self.NormalTolerance)
+            (Point,Normal,ParPoint) = FindOCCPointNormal(split_faces[0],self.PointTolerance,self.NormalTolerance)
 
             # Match the split face with all of the ToolShapes to see if this particular split_face is part of
             # any of the tools (delaminations). If it is, then it is inside a delaminated region and needs to
@@ -678,7 +678,7 @@ class OCCModelBuilder(object):
                 
                 # RefParamFace is in a 2D world of the (u,v) parameter space of the underlying surface,
                 # mapped to the (x,y) plane. 
-                if (layer.OCCPointInFace((ParPoint[0]*parScale,ParPoint[1]*parScale,0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
+                if (OCCPointInFace((ParPoint[0]*parScale,ParPoint[1]*parScale,0.0),RefParamFace,self.PointTolerance) == TopAbs_IN):
                     # Matched! This particular split_face is a delamination zone.
                     # Need to do another split for the no model zone
 
@@ -706,7 +706,7 @@ class OCCModelBuilder(object):
                 split_face=split_faces[facecnt]
                 BCType=BCTypes[facecnt]
 
-                (Point,Normal,ParPoint) = layer.FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
+                (Point,Normal,ParPoint) = FindOCCPointNormal(split_face,self.PointTolerance,self.NormalTolerance)
 
                 split_layerbodyfaces.append(LayerBodyFace(Face=split_face,
                                                           Point=Point,

@@ -98,7 +98,8 @@ from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
 from . import loaders
-
+from .tools import ProjectEdgesOntoFace,FindOCCPointNormal,SelectFaceByPointNormal,OCCPointInFace
+from . import solid
 
 def OffsetFaceMoreAlongDirection(face, offsetDir, PointTolerance):
     assert(offsetDir == 1 or offsetDir == -1)
@@ -123,183 +124,6 @@ def OffsetFaceMoreAlongDirection(face, offsetDir, PointTolerance):
     assert (len(OffsetFaces) == 1)  # Offset of a single face should give a single face
 
     return OffsetFaces[0]
-
-
-def ProjectEdgesOntoFace(edge_edges, face):
-    edge_curves = [BRep_Tool.Curve(edge) for edge in edge_edges]
-
-    surface = BRep_Tool.Surface(face)
-
-    # Note: edge_curves[i][1] and edge_curves[i][2] appear to be start and end u coordinates for curve
-
-    Projections = [GeomProjLib.geomprojlib_Project(edge_curve[0], surface) for edge_curve in edge_curves]
-
-    # Right here we should be trimming our projection to line up with layerbodyface1 and the unprojected edge (element of edge_edges)
-    # But it's probably OK not to, because we are using the projection to make a tool that will be used to cut the face
-    # and the extension of the tool beyond the face boundary shouldn't cause any problems, at least so long as thath
-    # geometry doesn't get too weird
-
-    ProjectionEdges = [BRepBuilderAPI.BRepBuilderAPI_MakeEdge(Projection).Edge() for Projection in Projections]
-
-    # If we did trimmming, we would need to construct wire from the edge(s) that actually projected to something within the face,
-    # with any gaps filled by appropriately trimmed edges from the face.
-
-    # ProjectedWireBuilder = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
-    #
-    # for ProjectionEdge in ProjectionEdges:
-    #    ProjectedWireBuilder.add(ProjectionEdge)
-    #    pass
-    #
-    # ProjectedWire = ProjectedWireBuilder.Wire()
-
-    # Need to take ProjectionEdges, which are located on layerbodysurface1
-    # and perform a offset from the surface
-    return ProjectionEdges
-
-# Parametric space search start location for FindOCCPointNormal()
-FindOCCPointNormal_refParPoint = np.array([0.05,0.1])
-
-def FindOCCPointNormal(Face, OrigPointTolerance, OrigNormalTolerance):
-    """ Given a face, find and return a (point, normal, parPoint)
-    that uniquely identifies the face. The point must be 
-    significantly farther than tolerance from any edge"""
-
-    # breptools_Write(Face,"/tmp/PointFind.brep")
-
-    # Evaluate reference parametric point
-    faceSurface = BRep_Tool().Surface(Face)
-    refParPoint = FindOCCPointNormal_refParPoint.copy()
-    refPointProps = GeomLProp_SLProps(faceSurface, refParPoint[0], refParPoint[1], 1, OrigPointTolerance)
-
-    faceNormal = gp_Vec(refPointProps.Normal())
-    if Face.Orientation == TopAbs_REVERSED:
-        # Face is reversed from underlying surface -> we need to flip the normal
-        faceNormal = -faceNormal
-        pass
-    facePoint = refPointProps.Value()
-    faceParPoint = refParPoint
-
-    # Check if original reference point is inside tha Face
-    FaceExplorer=BRepClass_FaceExplorer(Face)
-    C=BRepClass_FClassifier()
-    C.Perform(FaceExplorer, gp_Pnt2d(refParPoint[0],refParPoint[1]), OrigPointTolerance)
-
-    # If original point is not inside face iterate to find a point inside face
-    if (C.State()!=TopAbs_IN):
-
-        origPoint = facePoint
-        origPointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(origPoint).Vertex()
-        origParPoint = refParPoint
-
-        # Find the closest point by this method:
-        # https://www.opencascade.com/content/closest-point-step-object
-        DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPointVertex)
-        DistanceCalculator.Perform()
-        currentDist = DistanceCalculator.Value()
-
-        if DistanceCalculator.NbSolution() > 0:
-
-            closestDist = currentDist
-            # Evaluate (u,v) coordinates on this face of closest point
-            # !!!*** ParOnFaceS1 seems to fail sometimes
-            # because OCC finds an edge closer.
-            # In that case you can call DistanceCalculator.ParOnEdgeS1(1)
-            # to get the coordinate along the edge.
-            # You can identify which type the support is
-            # by calling DistanceCalculator.SupportOnShape(1).ShapeType()
-            # and comparing with TopAbs_EDGE, etc.
-            # From the documentation it looks like you might get
-            # TopAbs_VERTEX, as well
-
-            # Alternate method that might work is calculate the 3D point and
-            # then calculate the parametric value on the face
-            #(ClosestU, ClosestV) = DistanceCalculator.ParOnFaceS1(1)
-
-            currentCP = DistanceCalculator.PointOnShape1(1)
-            SAS = ShapeAnalysis_Surface(faceSurface)
-            currentUV = SAS.ValueOfUV(currentCP, OrigPointTolerance)
-            ClosestU = currentUV.X()
-            ClosestV = currentUV.Y()
-            [uMin, uMax, vMin, vMax] = SAS.Bounds()
-
-            angleIncrement = 1
-            parIncrement = 0.001 * (math.sqrt((uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin))/math.sqrt(2.00))
-            pointFound = False
-            for angle in range(0,359,angleIncrement):
-                newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
-                newV = ClosestV + parIncrement * math.sin(angle*math.pi/180.0)
-
-                newParPoint = np.array([newU, newV])
-                C.Perform(FaceExplorer, gp_Pnt2d(newParPoint[0], newParPoint[1]), OrigPointTolerance)
-                if (C.State() == TopAbs_IN):
-                    # Evaluate reference parametric point
-                    newPointProps = GeomLProp_SLProps(faceSurface, newParPoint[0], newParPoint[1], 1,
-                                                      OrigPointTolerance)
-                    faceNormal = gp_Vec(newPointProps.Normal())
-                    facePoint = newPointProps.Value()
-                    faceParPoint = newParPoint
-                    if Face.Orientation == TopAbs_REVERSED:
-                        # Face is reversed from underlying surface -> we need to flip the normal
-                        faceNormal = -faceNormal
-                        pass
-                    pointFound = True
-                    break
-                pass
-
-            if (not pointFound):
-                raise ValueError("Point inside face not found!")
-
-            pass
-
-        pass
-
-    # (vs. we get TopAbs_ON if it is on an edge rather the inside of the face)
-        
-    #    print('Point in Face')
-    # sys.modules["__main__"].__dict__.update(globals())
-    # sys.modules["__main__"].__dict__.update(locals())
-    # raise ValueError("Break")
-
-    return (np.array((facePoint.X(), facePoint.Y(), facePoint.Z()), dtype='d'),
-             np.array((faceNormal.X(), faceNormal.Y(), faceNormal.Z()), dtype='d'),
-             np.array((faceParPoint[0], faceParPoint[1]), dtype='d'))
-
-
-def OCCPointInFace(Point, Face, OrigPointTolerance):
-    """ Given a face and a Point check if point lies on the face"""
-
-    facePoint = gp_Pnt(Point[0],Point[1],Point[2])
-    # faceSurface = BRep_Tool().Surface(Face)
-    # SAS = ShapeAnalysis_Surface(faceSurface)
-    # currentUV = SAS.ValueOfUV(facePoint, OrigPointTolerance)
-    # parPointU = currentUV.X()
-    # parPointV = currentUV.Y()
-    # print(parPointU, parPointV)
-    #
-    #FaceExplorer = BRepClass_FaceExplorer(Face)
-    #C = BRepClass_FClassifier()
-    # C.Perform(FaceExplorer, gp_Pnt2d(parPointU, parPointV), OrigPointTolerance)
-
-    #C.Perform(Face, facePoint, OrigPointTolerance )
-
-    #return C.State()
-
-    # Find the closest point by this method
-    # https://www.opencascade.com/content/closest-point-step-object
-
-
-    origPointVertex = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(facePoint).Vertex()
-
-    DistanceCalculator = BRepExtrema_DistShapeShape(Face, origPointVertex)
-    DistanceCalculator.Perform()
-    if not DistanceCalculator.IsDone():
-        raise ValueError("Point to face distance calculation failed")
-    currentDist = DistanceCalculator.Value()
-
-
-    if (currentDist < OrigPointTolerance):
-        return TopAbs_IN
-    return TopAbs_OUT
 
 
 def VectorNormalize(v):
@@ -1585,11 +1409,12 @@ class LayerMold(object):
         # sys.modules["__main__"].__dict__.update(locals())
         # raise ValueError("Break")
 
-        return [cls.FromShell(MoldShell, OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
+        return (cls.FromShell(MoldShell, OrigDirPoint, OrigDirNormal, OrigDirTolerance),
+                ShellModel)
 
     @classmethod
     def CutMoldFromSolid(cls, solidfilename, toolfilename, OrigDirPoint=np.array((0.0, 0.0, 0.0)), OrigDirNormal=np.array((0.0, 0.0, -1.0)),
-                 OrigDirTolerance=1e-6):
+                         OrigDirPointTolerance=1e-5,OrigDirNormalTolerance=1e-6):
         """Create a LayerMold from a STEP, IGES, or BREP file and cut the mold using the tool
         The LayerMold containing a surface. OrigDirPoint and OrigDirNormal
         are used to define the "ORIG" direction. The closest point
@@ -1644,6 +1469,7 @@ class LayerMold(object):
             CurrentSolidShape = SplitSolidExp.Current()
             SplitSolidList.append(CurrentSolidShape)
             SplitSolidExp.Next()
+            pass
 
         GProps1 = GProp_GProps()
         brepgprop_VolumeProperties(SplitSolidList[0], GProps1)
@@ -1672,7 +1498,24 @@ class LayerMold(object):
         # point and normal. Extract the face and send as input to create the layer
         # structure
 
+        # ... So really we should iterate through the side faces of the resulting cut pieces
+        # by identifying which faces exist in both pieces. Then that set of side faces
+        # topologically splits the ORIG and the OFFSET sides... At which point we can
+        # identify the ORIG side by one of its faces matching OrigDirPoint and OrigDirNormal.
+        #
+        # For the time being we assume that the ORIG and OFFSET sides are singles faces and we
+        # can identify the ORIG directly by using OrigDirPoint and OrigDirNormal. 
 
+        OrigFace = SelectFaceByPointNormal(LayerSolidModel,OrigDirPoint,OrigDirNormal,OrigDirPointTolerance)
+        if OrigFace is None:
+            raise ValueError("Point %s not found any surface of LayerSolidModel cut from %s by %s" % (str(OrigDirPoint),solidfilename, toolfilename))
+
+
+        # Create a shell from the face
+        shellBuilder = BRep_Builder()
+        OrigShell = TopoDS_Shell()
+        shellBuilder.MakeShell(OrigShell)
+        shellBuilder.Add(OrigShell, OrigFace)
 
         # step_writer=STEPControl_Writer()
         # step_writer.Transfer(MoldShell,STEPControl_ShellBasedSurfaceModel,True)
@@ -1683,8 +1526,9 @@ class LayerMold(object):
         # sys.modules["__main__"].__dict__.update(locals())
         # raise ValueError("Break")
 
-        return [cls.FromShell(MoldShell, OrigDirPoint, OrigDirNormal, OrigDirTolerance), ShellModel]
-
+        return (cls.FromShell(OrigShell, OrigDirPoint, OrigDirNormal, OrigDirPointTolerance),
+                solid.Solid.FromOCC(SolidModel,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
+    
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):
         """Create a LayerMold from a STEP, IGES, or BREP file 
@@ -1824,6 +1668,9 @@ class LayerBodyFace(object): # Formerly LayerSurface
 
         # Update: Use OpenCascade IsSame operator
         # That tests for same underlying TShape (?) with same location but not necessarily orientation ... normal may be flipped.
+
+        # Note that this also works for testing equality
+        # with ImmutableSolidFace objects. 
         return self.Face.IsSame(other.Face)
 
 
@@ -1853,7 +1700,7 @@ class LayerBodyFace(object): # Formerly LayerSurface
         that, given a Normal, returns whether  that normal is pointing inside
         the LayerBody."""
 
-        (Point,Normal,ParPoint)=FindOCCPointNormal(Face,OrigPointTolerance=OrigPointTolerance,OrigNormalTolerance=OrigNormalTolerance)
+        (Point,Normal,ParPoint)=FindOCCPointNormal(Face,PointTolerance=OrigPointTolerance,NormalTolerance=OrigNormalTolerance)
 
         # For a LayerBodyFace inside a LayerBody, the normal
         # should be pointing outward. 
