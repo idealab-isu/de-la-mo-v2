@@ -1438,7 +1438,7 @@ class LayerMold(object):
 
         if (len(SolidList) > 1):
             raise ValueError("File %s contains more than one TopAbs_SOLID" % (solidfilename))
-        SolidShape = SolidList[0]
+        OrigSolidShape = SolidList[0]
 
         ToolExp = TopExp_Explorer(ToolShapes, TopAbs_SHELL)
         # Iterate over all shells
@@ -1456,7 +1456,7 @@ class LayerMold(object):
         ToolShape = ToolList[0]
 
         GASplitter = GEOMAlgo_Splitter()
-        GASplitter.AddArgument(SolidShape)
+        GASplitter.AddArgument(OrigSolidShape)
         GASplitter.AddTool(ToolShape)
         GASplitter.Perform()
 
@@ -1480,11 +1480,11 @@ class LayerMold(object):
         SurfArea2 = GProps2.Mass()
 
         if SurfArea1 > SurfArea2:
-            SolidModel = SplitSolidList[0]
+            HollowedSolidModel = SplitSolidList[0]
             LayerSolidModel = SplitSolidList[1]
             pass
         else:
-            SolidModel = SplitSolidList[1]
+            HollowedSolidModel = SplitSolidList[1]
             LayerSolidModel = SplitSolidList[0]
             pass
 
@@ -1527,7 +1527,7 @@ class LayerMold(object):
         # raise ValueError("Break")
 
         return (cls.FromShell(OrigShell, OrigDirPoint, OrigDirNormal, OrigDirPointTolerance),
-                solid.Solid.FromOCC(SolidModel,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
+                solid.Solid.FromOCC(OrigSolidShape,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
     
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):

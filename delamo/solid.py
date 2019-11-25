@@ -107,6 +107,31 @@ class Solid(object):
         _ImmutableSolid = ImmutableSolid.FromOCC(SolidShape,PointTolerance=PointTolerance,NormalTolerance=NormalTolerance)
         return cls(ImmutableSolid=_ImmutableSolid)
 
+
+    @classmethod
+    def CutLayerFromSolid(cls, InputSolid, layer):
+        """Cut the layer from the inputSolid
+        """
+
+        # Cut the layer solid model from the InputSolid
+
+
+
+        # Iterate through CutSolid and identify side faces of the layer that matches with the faces
+        # of the CutSolid
+
+
+
+
+        # Update the Solid Model of the CutSolid
+
+
+
+
+
+        CutSolid = None
+        return CutSolid
+
     pass
 
 

@@ -20,6 +20,7 @@ from delamo.api import bond_layers
 from delamo.api import SimpleCoordSys
 from delamo import process
 from delamo.layer import LayerMold
+from delamo.solid import Solid
 
 import os
 
@@ -88,12 +89,12 @@ LaminateAssemblyMeshing=DM.meshinstrs.rewrapobj(LaminateAssembly)
 # Basic parameters
 
 # Set layer thickness we are planning on using
-thickness = 0.199
+thickness = 2.19/8.0
 
 
 #[Mold, Shell] = LayerMold.CutMoldFromShell(os.path.join("..","data","FlatShell.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)))
 
-[Mold, Shell] = LayerMold.CutMoldFromSolid(os.path.join("..","data","FlatSolid.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)))
+[Mold, OrigSolid] = LayerMold.CutMoldFromSolid(os.path.join("..","data","FlatSolid.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)),OrigDirNormal=np.array((0.0, 0.0, -1.0)))
 
 
 # Load a NURBS mold surface from a file
@@ -108,11 +109,13 @@ coordsys=SimpleCoordSys((1.0,0.0,0.0),(0.0,1.0,0.0))
 
 # Create 1st layer by moving the distance specified by thickness
 # in the OFFSET_DIRECTION
-layer1 = Layer.CreateFromMold(DM,Mold,"OFFSET",thickness,"Layer_1",LaminaSection,0,coordsys=coordsys)
+layer1 = Layer.CreateFromMold(DM,Mold,"ORIG",thickness,"Layer_1",LaminaSection,0,coordsys=coordsys)
 
 # Once any breaks, etc. of a given layer are complete, it must be
 # finalized. 
 layer1.Finalize(DM)
+
+Solid.CutLayerFromSolid(OrigSolid, layer1)
 
 # The MeshSimple method is a shortcut over the underlying ABAQUS routines
 # It loops over each part in the layer and calls setElementType() with

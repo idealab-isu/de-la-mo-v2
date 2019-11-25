@@ -1237,12 +1237,12 @@ layup direction, etc."""
     @classmethod
     def CreateFromMold(cls,DM,mold,direction,thickness,name,Section,layup,meshsize=0.5,coordsys=None):
         """Create a layer atop the specified mold. 
- * direction: "OFFSET" or "ORIG"
- * thickness: Thickness of layer (offsetting operation)
- * name: Unique name for layer
- * Section: ABAQUS section fo the layer
- * layup: Ply orientation in degrees
- * coordsys: Reference coordinate system for layup"""
+         * direction: "OFFSET" or "ORIG"
+         * thickness: Thickness of layer (offsetting operation)
+         * name: Unique name for layer
+         * Section: ABAQUS section fo the layer
+         * layup: Ply orientation in degrees
+         * coordsys: Reference coordinate system for layup"""
 
         gk_layer=OCCLayer.CreateFromMold(name,mold,thickness,direction,DM.modelbuilder.PointTolerance,MeshSize=meshsize)
         
