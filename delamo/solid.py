@@ -52,6 +52,7 @@ from OCC.TopAbs import TopAbs_FORWARD
 from OCC.TopAbs import TopAbs_REVERSED
 from OCC.GeomAbs import GeomAbs_Arc
 from OCC.TopTools import TopTools_ListIteratorOfListOfShape
+from OCC.TopTools import TopTools_ListOfShape
 from OCC.TopoDS import TopoDS_Iterator
 from OCC.GeomLProp import GeomLProp_SLProps
 from OCC.gp import gp_Pnt2d
@@ -83,6 +84,12 @@ from OCC.STEPControl import STEPControl_GeometricCurveSet
 from OCC.IGESControl import IGESControl_Reader
 from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
 
+
+from OCC.BRepAlgoAPI import BRepAlgoAPI_BooleanOperation
+from OCC.BRepAlgoAPI import BRepAlgoAPI_Cut
+from OCC.BOPAlgo import BOPAlgo_CUT
+
+
 from .tools import ProjectEdgesOntoFace,FindOCCPointNormal,SelectFaceByPointNormal,OCCPointInFace
 
 class Solid(object):
@@ -103,34 +110,123 @@ class Solid(object):
         pass
 
     @classmethod
-    def FromOCC(cls,SolidShape,PointTolerance=1e-5,NormalTolerance=1e-6):
+    def FromOCC(cls,Name,SolidShape,PointTolerance=1e-5,NormalTolerance=1e-6):
         _ImmutableSolid = ImmutableSolid.FromOCC(SolidShape,PointTolerance=PointTolerance,NormalTolerance=NormalTolerance)
-        return cls(ImmutableSolid=_ImmutableSolid)
+        return cls(Name=Name,ImmutableSolid=_ImmutableSolid)
 
 
-    @classmethod
-    def CutLayerFromSolid(cls, InputSolid, layer):
-        """Cut the layer from the inputSolid
+    def SubtractLayer(self, layer,PointTolerance=1e-5,NormalTolerance=1e-6):
+        """Subtract the layer from the inputSolid
         """
 
         # Cut the layer solid model from the InputSolid
 
+        #BooleanOp = BRepAlgoAPI_BooleanOperation()
+        #BooleanOp.SetOperation(BOPAlgo_CUT)
+
+        BooleanOp = BRepAlgoAPI_Cut()
+
+        BooleanOp_ArgumentShapes = TopTools_ListOfShape()
+        BooleanOp_ArgumentShapes.Append(self.ImmutableSolid.Solid)
+        BooleanOp.SetArguments(BooleanOp_ArgumentShapes)
+        
+        BooleanOp_ToolShapes = TopTools_ListOfShape()
+        
+        for layerbody in layer.BodyList:
+            BooleanOp_ToolShapes.Append(layerbody.Shape)
+            pass
+
+        BooleanOp.SetTools(BooleanOp_ToolShapes)
+
+        BooleanOp.Build()
+
+        if BooleanOp.ErrorStatus() != 0:
+            raise ValueError("Error in subtraction boolean operation")
+
+        BooleanResult=BooleanOp.Shape()
+
+        #step_writer2=STEPControl_Writer()
+        #step_writer2.Transfer(BooleanResult,STEPControl_ManifoldSolidBrep,True)
+        #step_writer2.Write("/tmp/BooleanResult.step")
+
+        self.ImmutableSolid = ImmutableSolid.FromOCC(BooleanResult,PointTolerance=PointTolerance,NormalTolerance=NormalTolerance)
+
+        pass
+    
+
+    def layer_adjacent_side_faces(self,layer,PointTolerance=1e-5,NormalTolerance=1e-6):
+        """ return a face adjacency list indicating the faces within this solid that
+        map to (by point/normal identification) faces within the layer. 
+
+        NOTE: If the layer extends beyond the surface of the solid then the face in the layer
+        and the face in the solid will not be the same, because the surface of the solid does not
+        get imprinted onto the side of the layer. As a result such an adjacency may not be 
+        identified by this function depending on the locations of the points and thus such layers 
+        may not be successfully bonded (TIE boundary condition) to the solid. A warning messages
+        is generated in this case. As long as the number of unbonded layers is much smaller than
+        the total number of layers the influence of missing one or (worst-case) two tied layers is 
+        minimal then this is not a problem.
+        """
+        
+        # Iterate through layer and identify side faces of the layer that matches with the faces
+        # of the layer
 
 
-        # Iterate through CutSolid and identify side faces of the layer that matches with the faces
-        # of the CutSolid
+        FAL = []
+        
 
 
+        #exp = TopExp_Explorer(self.ImmutableSolid.Solid, TopAbs_FACE)
+        #
+        ## iterate over all faces
+        #
+        #
+        #while exp.More():
+        #    SolidFace=exp.Current()
+        #
+        #    
+        #    for layerbody in layer.BodyList:
+        #        for layerbodyface in layerbody.FaceListSide:
+        #
+        #            print("Checking %s against %s" % (str(layerbodyface.Face),str(SolidFace)))
+        #            
+        #            if layerbodyface.Face.IsSame(topods_Face(SolidFace)):
+        #                # Matches a side face
+        #                FAL.append({
+        #                    "name1": self.Name,
+        #                    "name2": layerbody.Name,
+        #                    "bcType": "TIE",
+        #                    "point1": layerbodyface.Point,
+        #                    "normal1": layerbodyface.Normal,
+        #                    })
+        #                break
+        #            pass
+        #        pass
+        #    exp.Next()
+        #    pass
 
 
-        # Update the Solid Model of the CutSolid
+        for layerbody in layer.BodyList:
+            for layerbodyface in layerbody.FaceListSide:
+                SolidFace = SelectFaceByPointNormal(self.ImmutableSolid.Solid,layerbodyface.Point,layerbodyface.Normal,PointTolerance,NormalTolerance)
 
+                if SolidFace is not None:
+                    # Matches a face in the solid
+                    FAL.append({
+                        "name1": self.Name,
+                        "name2": layerbody.Name,
+                        "bcType": "TIE",
+                        "point1": layerbodyface.Point,
+                        "normal1": layerbodyface.Normal,
+                    })
 
-
-
-
-        CutSolid = None
-        return CutSolid
+                    pass
+                else:
+                    print("WARNING: Side face from layer %s not matched in solid %s (if this happens for a large percentage of layers, it is a problem!)" % (layer.Name,self.Name))
+                    pass
+                pass
+            pass
+        return FAL
 
     pass
 

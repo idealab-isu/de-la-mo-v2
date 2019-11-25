@@ -1506,7 +1506,7 @@ class LayerMold(object):
         # For the time being we assume that the ORIG and OFFSET sides are singles faces and we
         # can identify the ORIG directly by using OrigDirPoint and OrigDirNormal. 
 
-        OrigFace = SelectFaceByPointNormal(LayerSolidModel,OrigDirPoint,OrigDirNormal,OrigDirPointTolerance)
+        OrigFace = SelectFaceByPointNormal(LayerSolidModel,OrigDirPoint,OrigDirNormal,OrigDirPointTolerance,OrigDirNormalTolerance)
         if OrigFace is None:
             raise ValueError("Point %s not found any surface of LayerSolidModel cut from %s by %s" % (str(OrigDirPoint),solidfilename, toolfilename))
 
@@ -1527,7 +1527,7 @@ class LayerMold(object):
         # raise ValueError("Break")
 
         return (cls.FromShell(OrigShell, OrigDirPoint, OrigDirNormal, OrigDirPointTolerance),
-                solid.Solid.FromOCC(OrigSolidShape,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
+                solid.Solid.FromOCC(os.path.split(solidfilename)[1],OrigSolidShape,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
     
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):

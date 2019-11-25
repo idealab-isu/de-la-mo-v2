@@ -236,7 +236,7 @@ def FindOCCPointNormal(Face, PointTolerance, NormalTolerance):
              np.array((faceNormal.X(), faceNormal.Y(), faceNormal.Z()), dtype='d'),
              np.array((faceParPoint[0], faceParPoint[1]), dtype='d'))
 
-def SelectFaceByPointNormal(InputTopology,Point,Normal,PointTolerance):
+def SelectFaceByPointNormal(InputTopology,Point,Normal,PointTolerance,NormalTolerance):
     """ Select a face from InputTopology that contains Point on its interior within PointTolerance.
     Does not currently use Normal Parameter. Returns a topods_Face or None"""
     # For the moment we don't actually use the normal...

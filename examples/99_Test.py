@@ -94,7 +94,7 @@ thickness = 2.19/8.0
 
 #[Mold, Shell] = LayerMold.CutMoldFromShell(os.path.join("..","data","FlatShell.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)))
 
-[Mold, OrigSolid] = LayerMold.CutMoldFromSolid(os.path.join("..","data","FlatSolid.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)),OrigDirNormal=np.array((0.0, 0.0, -1.0)))
+[Mold, Solid_To_Bond] = LayerMold.CutMoldFromSolid(os.path.join("..","data","FlatSolid.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)),OrigDirNormal=np.array((0.0, 0.0, -1.0)))
 
 
 # Load a NURBS mold surface from a file
@@ -115,7 +115,9 @@ layer1 = Layer.CreateFromMold(DM,Mold,"ORIG",thickness,"Layer_1",LaminaSection,0
 # finalized. 
 layer1.Finalize(DM)
 
-Solid.CutLayerFromSolid(OrigSolid, layer1)
+Solid_To_Bond.SubtractLayer(layer1.gk_layer,PointTolerance=DM.abqpointtolerance,NormalTolerance=1e-6)
+
+SolidFAL=Solid_To_Bond.layer_adjacent_side_faces(layer1.gk_layer,PointTolerance=1e-2)
 
 # The MeshSimple method is a shortcut over the underlying ABAQUS routines
 # It loops over each part in the layer and calls setElementType() with
