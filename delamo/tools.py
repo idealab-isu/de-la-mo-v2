@@ -196,6 +196,9 @@ def FindOCCPointNormal(Face, PointTolerance, NormalTolerance):
 
             angleIncrement = 1
             parIncrement = 0.001 * (math.sqrt((uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin))/math.sqrt(2.00))
+            if (parIncrement > 100):
+                print("WARNING: Face bounds of Face %s are incorrect! Reverting to default parametric value"%Face)
+                parIncrement = 0.001
             pointFound = False
             for angle in range(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
