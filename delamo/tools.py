@@ -169,6 +169,8 @@ def FindOCCPointNormal(Face, PointTolerance, NormalTolerance):
         DistanceCalculator.Perform()
         currentDist = DistanceCalculator.Value()
 
+        face_bounds_incorrect=False
+        
         if DistanceCalculator.NbSolution() > 0:
 
             closestDist = currentDist
@@ -193,23 +195,30 @@ def FindOCCPointNormal(Face, PointTolerance, NormalTolerance):
             ClosestU = currentUV.X()
             ClosestV = currentUV.Y()
             [uMin, uMax, vMin, vMax] = SAS.Bounds()
-
+            
+            # NOTE: Probably better to ask OpenCascade directly for
+            # parametric derivatives and move distance based on derivatives and tolerance. 
+            
             angleIncrement = 1
             parIncrement = 0.001 * (math.sqrt((uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin))/math.sqrt(2.00))
             if (parIncrement > 100):
-                print("WARNING: Face bounds of Face %s are incorrect! Reverting to default parametric value"%Face)
+                #import pdb
+                #pdb.set_trace()
+                #print("WARNING: Face bounds of Face %s are incorrect! Reverting to default parametric value"%Face)
+                face_bounds_incorrect=True
                 parIncrement = 0.001
+                pass
             pointFound = False
             for angle in range(0,359,angleIncrement):
                 newU = ClosestU + parIncrement * math.cos(angle*math.pi/180.0)
                 newV = ClosestV + parIncrement * math.sin(angle*math.pi/180.0)
 
                 newParPoint = np.array([newU, newV])
-                C.Perform(FaceExplorer, gp_Pnt2d(newParPoint[0], newParPoint[1]), PointTolerance)
+                C.Perform(FaceExplorer, gp_Pnt2d(newParPoint[0], newParPoint[1]), 3.0*PointTolerance) # Use larger tolerance here so are more likely to get TopAbs_ON if we are marginaly close to an edge
                 if (C.State() == TopAbs_IN):
                     # Evaluate reference parametric point
                     newPointProps = GeomLProp_SLProps(faceSurface, newParPoint[0], newParPoint[1], 1,
-                                                      PointTolerance)
+                                                      PointTolerance) 
                     faceNormal = gp_Vec(newPointProps.Normal())
                     facePoint = newPointProps.Value()
                     faceParPoint = newParPoint
@@ -222,8 +231,10 @@ def FindOCCPointNormal(Face, PointTolerance, NormalTolerance):
                 pass
 
             if (not pointFound):
+                if face_bounds_incorrect:
+                    raise ValueError("Point inside face not found! (face bounds incorrect)")           
                 raise ValueError("Point inside face not found!")
-
+            
             pass
 
         pass

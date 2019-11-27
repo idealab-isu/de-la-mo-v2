@@ -1377,14 +1377,14 @@ class OCCModelBuilder(object):
         #for layerobj in to_be_saved:
         #    for layerbodyobj in layerobj.BodyList:
                 
-        for layerbodyobj in to_be_saved:
-            step_writer.Transfer(layerbodyobj.Shape,STEPControl_ManifoldSolidBrep,True)
+        for layerbody_or_solid_obj in to_be_saved:
+            step_writer.Transfer(layerbody_or_solid_obj.Shape,STEPControl_ManifoldSolidBrep,True)
             
-            assert(not(layerbodyobj.Name in BodyNameSet)) # verify nome layerbodyname reuse!
+            assert(not(layerbody_or_solid_obj.Name in BodyNameSet)) # verify nome layerbodyname reuse!
             
-            BodyNameList.append(layerbodyobj.Name)
+            BodyNameList.append(layerbody_or_solid_obj.Name)
             
-            BodyNameSet.add(layerbodyobj.Name)
+            BodyNameSet.add(layerbody_or_solid_obj.Name)
             
             pass
         

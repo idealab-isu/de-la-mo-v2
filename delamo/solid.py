@@ -92,6 +92,8 @@ from OCC.BOPAlgo import BOPAlgo_CUT
 
 from .tools import ProjectEdgesOntoFace,FindOCCPointNormal,SelectFaceByPointNormal,OCCPointInFace
 
+writecount = 0
+
 class Solid(object):
     """ Represents a solid object. It is mutable, but only in certain ways
     (e.g. by subtraction, etc.). It will be an error if any bonded faces
@@ -100,6 +102,12 @@ class Solid(object):
     Name = None  # Name by which this solid is identified (for assigning boundary conditions, etc) 
     ImmutableSolid=None # ImmutableSolid instance
 
+    # define .Shape property for consistency with LayerBody to pull
+    # out the OCC Shape
+    @property
+    def Shape(self):
+        return self.ImmutableSolid.Solid
+    
     def __init__(self,**kwargs):
 
         for argname in kwargs:
@@ -145,10 +153,13 @@ class Solid(object):
 
         BooleanResult=BooleanOp.Shape()
 
-        #step_writer2=STEPControl_Writer()
-        #step_writer2.Transfer(BooleanResult,STEPControl_ManifoldSolidBrep,True)
-        #step_writer2.Write("/tmp/BooleanResult.step")
-
+        global writecount
+        
+        step_writer2=STEPControl_Writer()
+        step_writer2.Transfer(BooleanResult,STEPControl_ManifoldSolidBrep,True)
+        step_writer2.Write("/tmp/BooleanResult%d.step" % (writecount))
+        writecount +=1
+        
         self.ImmutableSolid = ImmutableSolid.FromOCC(BooleanResult,PointTolerance=PointTolerance,NormalTolerance=NormalTolerance)
 
         pass

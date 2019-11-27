@@ -41,6 +41,7 @@ from delamo.abqscript import write_abq_script
 from delamo.abqscript import _capture_assignments_as_variables
 from delamo.OCCModelBuilder import OCCModelBuilder
 from delamo.layer import Layer as OCCLayer
+from delamo.layer import LayerMold as OCCLayerMold
 import delamo
 
 
@@ -497,7 +498,7 @@ class Part(object):
     fe_materialorientation=None
     """Abaqus material orientation"""
 
-    gk_layerbody=None
+    gk_layerbody_or_solid=None
     """Geometry kernel representation of this part"""
     
     def __init__(self,**kwargs):
@@ -540,9 +541,9 @@ class Part(object):
             type=abqC.DEFORMABLE_BODY)
         
         newpart = cls(DM=DM,
-                      name=name,fe_part=fe_part,gk_layerbody=gk_layerbody)
+                      name=name,fe_part=fe_part,gk_layerbody_or_solid=None)
 
-        DM.to_be_saved.append(gk_layerbody)
+        DM.to_be_saved.append(gk_layerbody_or_soild)
         # Create instance of new part
         newpart.CreateInstance(dependent=abqC.ON)
         
@@ -550,7 +551,7 @@ class Part(object):
     
 
     @classmethod
-    def FromGK3D(cls,DM,gk_layerbody,shell=False,no_FE_instance=False,omit_from_FE=False):
+    def FromGK3D(cls,DM,gk_layerbody_or_solid,shell=False,no_FE_instance=False,omit_from_FE=False):
         """Define a solid or shell part from a 3D geometry kernel object. Ensures that 
         this geometry kernel object will be saved to the generated CAD file
         and programs ABAQUS to load it in and create an instance. """
@@ -561,9 +562,9 @@ class Part(object):
         if not omit_from_FE:
             geom_fh=DM.abq_assembly.mdb.openStep(DM.stepfile,scaleFromFile=abqC.ON)
             fe_part=DM.FEModel.PartFromGeometryFile(
-                name=gk_layerbody.Name,
+                name=gk_layerbody_or_solid.Name,
                 geometryFile=geom_fh,
-                bodyNum=DM.BodyNumDB[gk_layerbody.Name], #M.globals["LookupBodies"](M.BodyNumDB,bodyname),
+                bodyNum=DM.BodyNumDB[gk_layerbody_or_solid.Name], #M.globals["LookupBodies"](M.BodyNumDB,bodyname),
                 combine=False,
                 dimensionality=abqC.THREE_D,
                 type=abqC.DEFORMABLE_BODY)
@@ -573,10 +574,10 @@ class Part(object):
             pass
 
         newpart = cls(DM=DM,
-                      name=gk_layerbody.Name,fe_part=fe_part,gk_layerbody=gk_layerbody,shell=shell)
+                      name=gk_layerbody_or_solid.Name,fe_part=fe_part,gk_layerbody_or_solid=gk_layerbody_or_solid,shell=shell)
 
         if not omit_from_FE:
-            DM.to_be_saved.append(gk_layerbody)
+            DM.to_be_saved.append(gk_layerbody_or_solid)
 
             # Create instance of new part
             if not no_FE_instance:
@@ -860,7 +861,7 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
         assembly_assert(assembly_len(self.fe_part_meshing.cells)==1)   # Given how we construct the cohesive layer it should never have anything but exactly one cell
         #self.fe_part_meshing.NEED_TO_DETERMINE_SWEEP_PATH
 
-        (SweepPathEdgePoint, SweepPathEdgeTangent) = self.gk_layerbody.GetOffsetEdge()
+        (SweepPathEdgePoint, SweepPathEdgeTangent) = self.gk_layerbody_or_solid.GetOffsetEdge()
         # Get proxied Abaqus edge object. 
         SweepPathEdge=self.GetPartEdge_point_tangent((SweepPathEdgePoint,SweepPathEdgeTangent),self.DM.abqpointtolerance,self.DM.tangenttolerance)
 
@@ -1130,8 +1131,8 @@ class Layer(Assembly):
 
     def GetPartInstanceFaceRegionFromPoint(self,Point,PointTolerance):
         # May only be called after finalization
-        gk_layerbodyname = self.gk_layer.FindLayerBodyNameByPoint(Point,PointTolerance)
-        part = self.parts[gk_layerbodyname]
+        gk_layerbody_or_solid_name = self.gk_layer.FindLayerBodyNameByPoint(Point,PointTolerance)
+        part = self.parts[gk_layerbody_or_solid_name]
         region=part.GetInstanceFaceRegion(Point,PointTolerance) # get ABAQUS region
         return region
     
@@ -1674,6 +1675,109 @@ class shell_solid_coupling(object):
         return ssc
     pass
         
+
+
+
+class solid_solid_coupling(object):
+    """This class stores the various parameters required to implement solid-to-solid 
+    coupling for an embedded layer-by-layer model within a larger solid"""
+    
+    #solid=None
+    solidpart = None 
+    """class Part for which gk_layerbody_or_solid references the mutable Solid 
+    representation (solid.Solid) that is updated after each layer is cut out."""
+    
+
+    def __init__(self,**kwargs):
+        for key in kwargs:
+            assert(hasattr(self,key))
+            setattr(self,key,kwargs[key])
+            pass
+        pass
+
+    def embed_layer(self,DM,layer):
+        """Embed a layer in the surrounding solid. Only bonds side faces, not ORIG and OFFSET faces
+        (because we don't want to bond to something that will be removed in the next embed step)"""
+        
+        self.solidpart.gk_layerbody_or_solid.SubtractLayer(layer.gk_layer,PointTolerance=DM.modelbuilder.PointTolerance,NormalTolerance=DM.modelbuilder.NormalTolerance)
+        SolidFAL=self.solidpart.gk_layerbody_or_solid.layer_adjacent_side_faces(layer.gk_layer,PointTolerance=DM.modelbuilder.PointTolerance)
+
+
+        for sideface_adjacency in SolidFAL:
+            # NOTE: We only use point1, vector1 because
+            # the faces on both sides HAVE to line upt, therefore 
+            # a single (point, normal) must work for both
+            
+            if sideface_adjacency['bcType'] == "TIE":
+                print("    Tie, Body %s to %s" % (sideface_adjacency['name1'],sideface_adjacency['name2']))
+                
+                # name1 represents solid, name2 represents layerbody of layer
+                assert(sideface_adjacency["name1"]==self.solidpart.Name)
+                
+                self.solidpart
+                layer.parts[sideface_adjacency['name2']]
+
+                
+                point_normal = (face_adjacency['point1'],face_adjacency['normal1']),
+                
+                # Tie B.C.
+                # Can specify master=top_bodynum or master=bottom_bodynum 
+                # to force which element is master
+                
+                solidface=self.solidpart.GetInstanceFace_point_normal(point_normal,
+                                                                      DM.abqpointtolerance,
+                                                                      DM.normaltolerance)
+                layersideface=layer.parts[sideface_adjacency['name2']].GetInstanceFace_point_normal(point_normal,
+                                                                                                    DM.abqpointtolerance,
+                                                                                                    DM.normaltolerance)
+                
+                # Could create surfaces here
+                # solidsurface=Laminate.Surface(name="%sSolid" % (self.toplamina.partname),side1Faces=topfaces)
+                # layersidesurface=Laminate.Surface(name="%sLayerSide" % (self.bottomlamina.partname),side1Faces=bottmfaces)
+                
+                # Note that this creates a "Surface-like" region, not the "Set-like" regions used in the Get...Region() functions above. See Abaqus Scripting Reference Guide section 45.3 for the distinction
+                solidregion=self.DM.regionToolset.Region(side1Faces=solidface)
+                layersideregion=self.DM.regionToolset.Region(side1Faces=layersideface)
+                
+                # If the faces are subdivided on one side, 
+                # have found that convergence is improved by using
+                # the little subdivided faces as masters
+                # and the big unified face as slave
+                
+                name="SolidSolidCoupling_%s_%s_Continuity_%d" % (sideface_adjacency["name1"],sideface_adjacency["name2"],self.DM.get_unique())
+                
+                
+                tie=FEModel.Tie(name=name,
+                                master=layersideregion,
+                                slave=solidregion,
+                                positionToleranceMethod=abqC.COMPUTED,
+                                adjust=abqC.ON,
+                                tieRotations=abqC.ON,
+                                thickness=abqC.ON)
+                pass
+            pass
+        
+
+        pass
+    
+    @classmethod
+    def from_solid_and_tool(cls,DM,solid_filename,tool_filename,OrigDirPoint=np.array((0.0, 0.0, 0.0)),OrigDirNormal=np.array((0.0, 0.0, -1.0))):
+        """Create layermold and solid_solid_coupling object from a solid and a tool.
+        OrigDirPoint and OrigDirNormal represent a point and normal that select a surface and ORIG direction from the region 
+        cut out by tool from solid. The ORIG direction is outward from the solid, so that layers accumulate in the OFFSET direction 
+        can then replace portions of the solid with embed_layer() """
+        
+        (Mold, Solid_To_Bond) = OCCLayerMold.CutMoldFromSolid(solid_filename,tool_filename,OrigDirPoint=OrigDirPoint,OrigDirNormal=OrigDirNormal)
+        solidpart = Part.FromGK3D(DM,Solid_To_Bond)
+        
+            
+        ssc = cls(solidpart = solidpart)
+        
+
+        return (Mold,ssc)
+    pass
+        
+
 # !!!*** the parameters of the bond_layers() call must be kept in sync
 # with the bond_layers_params and bond_layers_default_params
 # variables in processor.py
