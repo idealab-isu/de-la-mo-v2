@@ -1510,6 +1510,10 @@ class LayerMold(object):
         if OrigFace is None:
             raise ValueError("Point %s not found any surface of LayerSolidModel cut from %s by %s" % (str(OrigDirPoint),solidfilename, toolfilename))
 
+
+        # Need to compute the face normal and then compare it with the OrigDirNormal. If the direction
+        # is reversed, then the face needs to be Complemented.
+        # For now it seems that the face needs to be Complemented.
         if (OrigFace.Orientation() == TopAbs_FORWARD):
             OrigFace = OrigFace.Complemented();
 
