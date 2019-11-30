@@ -14,7 +14,7 @@
 
 import numpy as np
 
-from delamo.api import DelamoModeler 
+from delamo.api import DelamoModeler
 from delamo.api import Layer
 from delamo.api import bond_layers
 from delamo.api import SimpleCoordSys
@@ -29,10 +29,10 @@ import os
 
 
 # Initialize the DeLaMo model
-DM=DelamoModeler.Initialize(globals(),
-                            pointtolerancefactor=100.0,
-                            normaltolerance=100e-4,
-                            GapWidth=0.0)
+DM = DelamoModeler.Initialize(globals(),
+                              pointtolerancefactor=100.0,
+                              normaltolerance=100e-4,
+                              GapWidth=0.0)
 
 # This script then generates both a CAD file and a Python script.
 # The Python script can be run from Abaqus. It includes the 
@@ -52,14 +52,16 @@ DM=DelamoModeler.Initialize(globals(),
 # to be "ORIGINAL"
 (script_to_generate,
  cad_file_path_from_script,
- layer_boundary_template) = process.output_filenames("07_SolidSolidCoupling",process="DEFECT_INSERTION",phase="ORIGINAL",apply_damage_script="07_SolidSolidCoupling_add_damage.py",)
+ layer_boundary_template) = process.output_filenames("07_SolidSolidCoupling", process="DEFECT_INSERTION",
+                                                     phase="ORIGINAL",
+                                                     apply_damage_script="07_SolidSolidCoupling_add_damage.py", )
 
 # When writing a DeLaMo script, you start by creating a 
 # finite element initialization script. This is a 
 # Python script for ABAQUS that defines your various parameters
 # -- material properties, etc. as Python variables.  
 # In this case they are stored in the "abqparams_CFRP.py" file
-DM.abaqus_init_script("abqparams_CFRP.py",globals())
+DM.abaqus_init_script("abqparams_CFRP.py", globals())
 
 # The above call automatically inserts wrapped copies of variables 
 # defined in those scripts into the global variable space. Then you 
@@ -81,66 +83,68 @@ DM.abaqus_init_script("abqparams_CFRP.py",globals())
 # one of these variables that will execute in an alternate context. 
 #
 # For example, 
-LaminateAssemblyMeshing=DM.meshinstrs.rewrapobj(LaminateAssembly)
+LaminateAssemblyMeshing = DM.meshinstrs.rewrapobj(LaminateAssembly)
 # Creates a reference to the LaminateAssembly, for which method calls
 # execute in the meshing context
-
 
 
 # Basic parameters
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 04_Delam_plate_add_damage.py ***
-thickness = 2.19/8.0
+thickness = 2.19 / 8.0
 
-(OrigMold, SolidSolidCoupling) = solid_solid_coupling.from_solid_and_tool(DM,os.path.join("..","data","FlatSolid.STEP"),os.path.join("..","data","CuttingTool2.STEP"),OrigDirPoint=np.array((0.0, 60.0, 0.0)),OrigDirNormal=np.array((0.0, 0.0, -1.0)))
+(OrigMold, SolidSolidCoupling) = solid_solid_coupling.from_solid_and_tool(DM,
+                                                                          os.path.join("..", "data", "FlatSolid.STEP"),
+                                                                          os.path.join("..", "data",
+                                                                                       "CuttingTool2.STEP"),
+                                                                          OrigDirPoint=np.array((0.0, 60.0, 0.0)),
+                                                                          OrigDirNormal=np.array((0.0, 0.0, 1.0)))
 
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,
 # +y direction across 0 deg fibers, equivalent to
 # the default (when coordsys is not specified)
-coordsys=SimpleCoordSys((1.0,0.0,0.0),(0.0,1.0,0.0)) 
+coordsys = SimpleCoordSys((1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
 
-
-layup = [0,45,-45,90,90,-45,45,0] # assumed layup
-
+layup = [0, 45, -45, 90, 90, -45, 45, 0]  # assumed layup
 
 # Create and add point marker for fixed faced boundary condition
 # There is a surface at y=-25 mm  from z= 0...0.2 mm
 # This point identifies it
-FixedPoint=[0,-107.95,1.] 
-ForcePoint=[0,+107.95,1.] 
+FixedPoint = [0, -107.95, 1.]
+ForcePoint = [0, +107.95, 1.]
 
-Mold=OrigMold
-previouslayer=None
-layers=[]
+Mold = OrigMold
+previouslayer = None
+layers = []
 
 for layernum in range(8):
-    layer = Layer.CreateFromMold(DM,Mold,"OFFSET",thickness,"Layer_%d" % (layernum+1),LaminaSection,layup[layernum],coordsys=coordsys)
+    layer = Layer.CreateFromMold(DM, Mold, "OFFSET", thickness, "Layer_%d" % (layernum + 1), LaminaSection,
+                                 layup[layernum], coordsys=coordsys)
 
     layers.append(layer)
-    
+
     # Once any breaks, etc. of a given layer are complete, it must be
     # finalized. 
     layer.Finalize(DM)
 
     # Embed layer in solid
-    SolidSolidCoupling.embed_layer(DM,layer)
-    
+    SolidSolidCoupling.embed_layer(DM, layer)
+
     # The MeshSimple method is a shortcut over the underlying ABAQUS routines
     # It loops over each part in the layer and calls setElementType() with
     # the specified MeshElemTypes, setMeshControls() with the given shape
     # and technique, and seedPart() with the given mesh size, deviation factor,
     # and minsizefactor. and refines the mesh near any given refined_edges
-    
+
     # Note that ABAQUS constants must be referenced as part of abqC
     # rather than used directly 
-    layer.MeshSimple(MeshElemTypes,meshsize,abqC.HEX_DOMINATED,abqC.SYSTEM_ASSIGN)
-
-
+    layer.MeshSimple(MeshElemTypes, meshsize, abqC.HEX_DOMINATED, abqC.SYSTEM_ASSIGN)
 
     if previouslayer is not None:
-        bond_layers(DM,previouslayer, layer, CohesiveInteraction=CohesiveInteraction, ContactInteraction=ContactInteraction)
+        bond_layers(DM, previouslayer, layer, CohesiveInteraction=CohesiveInteraction,
+                    ContactInteraction=ContactInteraction)
         pass
 
     # mold for next layer
@@ -149,11 +153,9 @@ for layernum in range(8):
     # previouslayer for next layer
     previouslayer = layer
 
-
     # loop back
 
     pass
-
 
 # Define a fixed boundary condition based on FixedPoint.
 # EncastreBC is an ABAQUS function that was found by
@@ -161,9 +163,9 @@ for layernum in range(8):
 # replay (.rpy) file. 
 FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
                    createStepName=ApplyForceStep.name,
-                   region=layer.singlepart.GetInstanceFaceRegion(FixedPoint,0.02))
+                   region=layer.singlepart.GetInstanceFaceRegion(FixedPoint, 0.02))
 
-ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa 
+ForceVector = [0.0, 0.0, -5e-2]  # Units of MPa
 
 # Call ABAQUS SurfaceTraction method
 # Again, this came from looking at ABAQUS replay (.rpy) output
@@ -171,7 +173,7 @@ ForceVector=[ 0.0, 0.0, -5e-2 ] # Units of MPa
 # prefix. 
 FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
                         createStepName=ApplyForceStep.name,
-                        region=layers[0].singlepart.GetInstanceFaceRegionSurface(ForcePoint,0.1),
+                        region=layers[0].singlepart.GetInstanceFaceRegionSurface(ForcePoint, 0.1),
                         distributionType=abqC.UNIFORM,
                         field='',
                         localCsys=None,
@@ -179,12 +181,11 @@ FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
                         follower=abqC.OFF,
                         resultant=abqC.ON,
                         magnitude=np.linalg.norm(ForceVector),
-                        directionVector=((0.0,0.0,0.0),tuple(ForceVector/np.linalg.norm(ForceVector))),
+                        directionVector=((0.0, 0.0, 0.0), tuple(ForceVector / np.linalg.norm(ForceVector))),
                         amplitude=abqC.UNSET)
 
-
 # You can have the job auto-start when the Python script is run
-#DM.RunJob(BendingJob)
+# DM.RunJob(BendingJob)
 
 # Finalization generates the output script and CAD model. 
-DM.Finalize(script_to_generate,cad_file_path_from_script)
+DM.Finalize(script_to_generate, cad_file_path_from_script)

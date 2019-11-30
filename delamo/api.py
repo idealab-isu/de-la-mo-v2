@@ -1698,56 +1698,52 @@ class solid_solid_coupling(object):
     def embed_layer(self,DM,layer):
         """Embed a layer in the surrounding solid. Only bonds side faces, not ORIG and OFFSET faces
         (because we don't want to bond to something that will be removed in the next embed step)"""
-        
+
         self.solidpart.gk_layerbody_or_solid.SubtractLayer(layer.gk_layer,PointTolerance=DM.modelbuilder.PointTolerance,NormalTolerance=DM.modelbuilder.NormalTolerance)
         SolidFAL=self.solidpart.gk_layerbody_or_solid.layer_adjacent_side_faces(layer.gk_layer,PointTolerance=DM.modelbuilder.PointTolerance)
 
 
         for sideface_adjacency in SolidFAL:
             # NOTE: We only use point1, vector1 because
-            # the faces on both sides HAVE to line upt, therefore 
+            # the faces on both sides HAVE to line upt, therefore
             # a single (point, normal) must work for both
-            
+
             if sideface_adjacency['bcType'] == "TIE":
                 print("    Tie, Body %s to %s" % (sideface_adjacency['name1'],sideface_adjacency['name2']))
-                
-                # name1 represents solid, name2 represents layerbody of layer
-                assert(sideface_adjacency["name1"]==self.solidpart.Name)
-                
-                self.solidpart
-                layer.parts[sideface_adjacency['name2']]
 
-                
-                point_normal = (face_adjacency['point1'],face_adjacency['normal1']),
-                
+                # name1 represents solid, name2 represents layerbody of layer
+                assert(sideface_adjacency["name1"]==self.solidpart.name)
+
+                point_normal = (sideface_adjacency['point1'],sideface_adjacency['normal1']),
+
                 # Tie B.C.
-                # Can specify master=top_bodynum or master=bottom_bodynum 
+                # Can specify master=top_bodynum or master=bottom_bodynum
                 # to force which element is master
-                
+
                 solidface=self.solidpart.GetInstanceFace_point_normal(point_normal,
                                                                       DM.abqpointtolerance,
                                                                       DM.normaltolerance)
                 layersideface=layer.parts[sideface_adjacency['name2']].GetInstanceFace_point_normal(point_normal,
                                                                                                     DM.abqpointtolerance,
                                                                                                     DM.normaltolerance)
-                
+
                 # Could create surfaces here
                 # solidsurface=Laminate.Surface(name="%sSolid" % (self.toplamina.partname),side1Faces=topfaces)
                 # layersidesurface=Laminate.Surface(name="%sLayerSide" % (self.bottomlamina.partname),side1Faces=bottmfaces)
-                
+
                 # Note that this creates a "Surface-like" region, not the "Set-like" regions used in the Get...Region() functions above. See Abaqus Scripting Reference Guide section 45.3 for the distinction
-                solidregion=self.DM.regionToolset.Region(side1Faces=solidface)
-                layersideregion=self.DM.regionToolset.Region(side1Faces=layersideface)
-                
-                # If the faces are subdivided on one side, 
+                solidregion=DM.regionToolset.Region(side1Faces=solidface)
+                layersideregion=DM.regionToolset.Region(side1Faces=layersideface)
+
+                # If the faces are subdivided on one side,
                 # have found that convergence is improved by using
                 # the little subdivided faces as masters
                 # and the big unified face as slave
-                
-                name="SolidSolidCoupling_%s_%s_Continuity_%d" % (sideface_adjacency["name1"],sideface_adjacency["name2"],self.DM.get_unique())
-                
-                
-                tie=FEModel.Tie(name=name,
+
+                name="SolidSolidCoupling_%s_%s_Continuity_%d" % (sideface_adjacency["name1"],sideface_adjacency["name2"],DM.get_unique())
+
+
+                tie=DM.FEModel.Tie(name=name,
                                 master=layersideregion,
                                 slave=solidregion,
                                 positionToleranceMethod=abqC.COMPUTED,
@@ -1756,9 +1752,10 @@ class solid_solid_coupling(object):
                                 thickness=abqC.ON)
                 pass
             pass
-        
+
 
         pass
+
     
     @classmethod
     def from_solid_and_tool(cls,DM,solid_filename,tool_filename,OrigDirPoint=np.array((0.0, 0.0, 0.0)),OrigDirNormal=np.array((0.0, 0.0, -1.0))):

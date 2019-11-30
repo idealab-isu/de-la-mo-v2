@@ -1510,6 +1510,8 @@ class LayerMold(object):
         if OrigFace is None:
             raise ValueError("Point %s not found any surface of LayerSolidModel cut from %s by %s" % (str(OrigDirPoint),solidfilename, toolfilename))
 
+        if (OrigFace.Orientation() == TopAbs_FORWARD):
+            OrigFace = OrigFace.Complemented();
 
         # Create a shell from the face
         shellBuilder = BRep_Builder()
