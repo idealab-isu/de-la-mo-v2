@@ -145,9 +145,6 @@ for layernum in range(10):
     # finalized. 
     layer.Finalize(DM)
 
-    # Embed layer in solid
-    SolidSolidCoupling.embed_layer(DM, layer)
-
     # The MeshSimple method is a shortcut over the underlying ABAQUS routines
     # It loops over each part in the layer and calls setElementType() with
     # the specified MeshElemTypes, setMeshControls() with the given shape
@@ -158,10 +155,14 @@ for layernum in range(10):
     # rather than used directly 
     layer.MeshSimple(MeshElemTypes, meshsize, abqC.HEX_DOMINATED, abqC.SYSTEM_ASSIGN)
 
+    # Bond layer to previous layer
     if previouslayer is not None:
         bond_layers(DM, previouslayer, layer, CohesiveInteraction=CohesiveInteraction,
                     ContactInteraction=ContactInteraction)
         pass
+
+    # Embed layer in solid
+    SolidSolidCoupling.embed_layer(DM, layer)
 
     # mold for next layer
     Mold = layer.gk_layer.OffsetMold()

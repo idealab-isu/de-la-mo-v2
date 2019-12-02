@@ -153,12 +153,11 @@ class Solid(object):
 
         BooleanResult=BooleanOp.Shape()
 
-        global writecount
-        
-        step_writer2=STEPControl_Writer()
-        step_writer2.Transfer(BooleanResult,STEPControl_ManifoldSolidBrep,True)
-        step_writer2.Write("/tmp/BooleanResult%d.step" % (writecount))
-        writecount +=1
+        # global writecount
+        # step_writer2=STEPControl_Writer()
+        # step_writer2.Transfer(BooleanResult,STEPControl_ManifoldSolidBrep,True)
+        # step_writer2.Write("/tmp/BooleanResult%d.step" % (writecount))
+        # writecount +=1
         
         self.ImmutableSolid = ImmutableSolid.FromOCC(BooleanResult,PointTolerance=PointTolerance,NormalTolerance=NormalTolerance)
 
