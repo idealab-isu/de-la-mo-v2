@@ -418,6 +418,12 @@ class Layer(object):
         from this layer!) """
         return LayerMold.FromFaceLists([ Body.FaceListOrig for Body in self.BodyList ])
 
+    def RemoveLayerBody(self, bodyNum):
+        """Remove the layer body using the index bodyNum"""
+
+        self.BodyList.pop(bodyNum)
+        return None
+
     def Split(self, crackWireFile, Tolerance):
         """Split the layer using the crackWire outline"""
 
@@ -434,8 +440,6 @@ class Layer(object):
             pass
         self.BodyList = ReplacementLayerBodyList
         pass
-
-
 
     pass
 
