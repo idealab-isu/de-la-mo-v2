@@ -876,6 +876,27 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
         self.fe_part_meshing.generateMesh()
         pass
     
+    def ApplyLayup(self,coordsys,layupdirection,fiberorientation=None):
+        """Assign self.fe_datum_csys and self.fe_materialorientation"""
+
+        if fiberorientation is not None:
+            self.fe_materialorientation = self.DM.fiberinstrs.rewrapobj(self.fe_part.MaterialOrientation)
+            self.fe_materialorientation = self.fe_materialorientation(
+                region=self.DM.regionToolset.Region(
+                    cells=self.fe_part.cells),
+                orientationType=abqC.FIELD, axis=abqC.AXIS_3,
+                fieldName='%s_orientation' % self.name,
+                localCsys=None,
+                additionalRotationType=abqC.ROTATION_NONE,
+                angle=0.0,
+                additionalRotationField='',
+                stackDirection=abqC.STACK_3)
+        else:
+            coordsys.ApplyLayup(self, layupdirection)
+        pass
+
+
+
     pass
 
 class LayerPart(Part):
@@ -894,25 +915,6 @@ class LayerPart(Part):
             self.fe_part_meshing=self.DM.meshinstrs.rewrapobj(self.fe_part)
 
             pass
-        pass
-
-    def ApplyLayup(self,coordsys,layupdirection,fiberorientation):
-        """Assign self.fe_datum_csys and self.fe_materialorientation"""
-
-        if fiberorientation is not None:
-            self.fe_materialorientation = self.DM.fiberinstrs.rewrapobj(self.fe_part.MaterialOrientation)
-            self.fe_materialorientation = self.fe_materialorientation(
-                region=self.DM.regionToolset.Region(
-                    cells=self.fe_part.cells),
-                orientationType=abqC.FIELD, axis=abqC.AXIS_3,
-                fieldName='%s_orientation' % self.name,
-                localCsys=None,
-                additionalRotationType=abqC.ROTATION_NONE,
-                angle=0.0,
-                additionalRotationField='',
-                stackDirection=abqC.STACK_3)
-        else:
-            coordsys.ApplyLayup(self, layupdirection)
         pass
 
 
@@ -1061,8 +1063,8 @@ class SimpleCoordSys(CoordSys):
         self.xyz_to_oriented_mat = self.oriented_to_xyz_mat.T 
         pass
 
-    def ApplyLayup(self,layerpart,layupdirection):
-        """Set the material orientation of the specified layerpart to layupdirection (in degrees) relative to this coordinate frame"""
+    def ApplyLayup(self,part,layupdirection):
+        """Set the material orientation of the specified part or layerpart to layupdirection (in degrees) relative to this coordinate frame"""
 
         oriented_point1 = (np.cos(layupdirection*np.pi/180.0),
                            np.sin(layupdirection*np.pi/180.0),
@@ -1073,24 +1075,24 @@ class SimpleCoordSys(CoordSys):
 
         xyz_point1=np.dot(self.oriented_to_xyz_mat,oriented_point1)
         xyz_point2=np.dot(self.oriented_to_xyz_mat,oriented_point2)
-        layerpart.fe_datum_csys=layerpart.fe_part.DatumCsysByThreePoints(coordSysType=abqC.CARTESIAN,
+        part.fe_datum_csys=part.fe_part.DatumCsysByThreePoints(coordSysType=abqC.CARTESIAN,
                                                                          origin=(0.0,0.0,0.0),
                                                                          point1=tuple(xyz_point1),
                                                                          point2=tuple(xyz_point2),
-                                                                         name="%s_csys" % (layerpart.name))
+                                                                         name="%s_csys" % (part.name))
         
         
         # Can we simplify things by not defining a new CSYS for each, but just applying
         # angle, below??? ... would use DatumCsysByDefault() of Feature object
         
-        layerpart.fe_materialorientation=layerpart.fe_part.MaterialOrientation(additionalRotationField='',
+        part.fe_materialorientation=part.fe_part.MaterialOrientation(additionalRotationField='',
                                                                      additionalRotationType=abqC.ROTATION_NONE,
                                                                      angle=0.0,
                                                                      axis=abqC.AXIS_3,
                                                                      fieldName='',
-                                                                     localCsys=layerpart.fe_part.datums[layerpart.fe_datum_csys.id],
+                                                                     localCsys=part.fe_part.datums[part.fe_datum_csys.id],
                                                                      orientationType=abqC.SYSTEM,
-                                                                     region=layerpart.DM.regionToolset.Region(cells=layerpart.fe_part.cells),
+                                                                     region=part.DM.regionToolset.Region(cells=part.fe_part.cells),
                                                                      stackDirection=abqC.STACK_3)
         
         pass
@@ -1714,7 +1716,7 @@ class solid_solid_coupling(object):
                 # name1 represents solid, name2 represents layerbody of layer
                 assert(sideface_adjacency["name1"]==self.solidpart.name)
 
-                point_normal = (sideface_adjacency['point1'],sideface_adjacency['normal1']),
+                point_normal = (sideface_adjacency['point1'],sideface_adjacency['normal1'])
 
                 # Tie B.C.
                 # Can specify master=top_bodynum or master=bottom_bodynum

@@ -102,6 +102,8 @@ thickness2 = (4.57197 - 2.19456)/ 8.0
                                                                           OrigDirPoint=np.array((0.0, 60.0, 0.0)),
                                                                           OrigDirNormal=np.array((0.0, 0.0, 1.0)))
 
+
+
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,
 # +y direction across 0 deg fibers, equivalent to
@@ -109,6 +111,32 @@ thickness2 = (4.57197 - 2.19456)/ 8.0
 coordsys = SimpleCoordSys((1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
 
 layup = [0, 45, -45, 90, 90, -45, 45, 0, 0, 45, -45, 90, 90, -45, 45, 0]  # assumed layup
+
+
+
+# define properties for solid
+solidmeshsize=15.0 # mm
+
+# Define ABAQUS section for surrounding solid model.. Should really make principal axes function of position for stiffener portion...
+
+## Unfortunately ABAQUS can't use a solid section for a complicated geometry
+## that needs to be Tet meshed. But if it weren't so complicated and it
+## could be meshed, here's how you would do it: 
+
+#sectionlayers = [ section.SectionLayer(material='CFRPLaminaMat', thickness=0.125, orientAngle = layupangle, numIntPts=1,plyName='') for layupangle in layup ]
+
+#SolidSection=FEModel.CompositeSolidSection(name='SolidSection',layupName='SolidSectionLayup',symmetric=False, layup = sectionlayers )
+
+# Instead we model the solid as just a general solid with a single orientation
+# For the moment, model the solid as uniaxial... Should probably build a hybrid stiffness model based on laminate theory
+SolidSection=FEModel.HomogeneousSolidSection(name='LaminaSection',material=CFRPLaminaMat.name,thickness=None)
+
+SolidSolidCoupling.solidpart.MeshSimple(MeshElemTypes, solidmeshsize, abqC.TET, abqC.FREE)
+SolidSolidCoupling.solidpart.AssignSection(SolidSection)
+SolidSolidCoupling.solidpart.ApplyLayup(coordsys,0.0) # orientation of 0 means that 0 degrees as defined in the SolidSection layers lines up with the first axis (fiber direction) of the coordsys. 
+
+
+
 
 # Create and add point marker for fixed faced boundary condition
 # There is a surface at y=-25 mm  from z= 0...0.2 mm
