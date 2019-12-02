@@ -92,10 +92,11 @@ LaminateAssemblyMeshing = DM.meshinstrs.rewrapobj(LaminateAssembly)
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 04_Delam_plate_add_damage.py ***
-thickness = 2.19 / 8.0
+thickness1 = 2.19456 / 8.0
+thickness2 = (4.57197 - 2.19456)/ 8.0
 
 (OrigMold, SolidSolidCoupling) = solid_solid_coupling.from_solid_and_tool(DM,
-                                                                          os.path.join("..", "data", "FlatSolid.STEP"),
+                                                                          os.path.join("..", "data", "NASAShellOverwrap.STEP"),
                                                                           os.path.join("..", "data",
                                                                                        "CuttingTool2.STEP"),
                                                                           OrigDirPoint=np.array((0.0, 60.0, 0.0)),
@@ -107,7 +108,7 @@ thickness = 2.19 / 8.0
 # the default (when coordsys is not specified)
 coordsys = SimpleCoordSys((1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
 
-layup = [0, 45, -45, 90, 90, -45, 45, 0]  # assumed layup
+layup = [0, 45, -45, 90, 90, -45, 45, 0, 0, 45, -45, 90, 90, -45, 45, 0]  # assumed layup
 
 # Create and add point marker for fixed faced boundary condition
 # There is a surface at y=-25 mm  from z= 0...0.2 mm
@@ -119,9 +120,24 @@ Mold = OrigMold
 previouslayer = None
 layers = []
 
-for layernum in range(8):
+# Create the flat region
+for layernum in range(10):
+
+    # Set the thickness for the 2 zones
+    if (layernum < 8):
+        thickness = thickness1
+    else:
+        thickness = thickness2
+
     layer = Layer.CreateFromMold(DM, Mold, "OFFSET", thickness, "Layer_%d" % (layernum + 1), LaminaSection,
                                  layup[layernum], coordsys=coordsys)
+
+
+    # If it is the 9th layer, then cut the layer
+    if (layernum == 8):
+        layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
+        layer.gk_layer.RemoveLayerBody(1)
+        pass
 
     layers.append(layer)
 
@@ -161,28 +177,28 @@ for layernum in range(8):
 # EncastreBC is an ABAQUS function that was found by
 # using the ABAQUS/CAE interface and then looking at the
 # replay (.rpy) file. 
-FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-                   createStepName=ApplyForceStep.name,
-                   region=layer.singlepart.GetInstanceFaceRegion(FixedPoint, 0.02))
-
-ForceVector = [0.0, 0.0, -5e-2]  # Units of MPa
-
-# Call ABAQUS SurfaceTraction method
-# Again, this came from looking at ABAQUS replay (.rpy) output
-# Observe again that all ABAQUS symbolic constants need the "abqC"
-# prefix. 
-FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
-                        createStepName=ApplyForceStep.name,
-                        region=layers[0].singlepart.GetInstanceFaceRegionSurface(ForcePoint, 0.1),
-                        distributionType=abqC.UNIFORM,
-                        field='',
-                        localCsys=None,
-                        traction=abqC.GENERAL,
-                        follower=abqC.OFF,
-                        resultant=abqC.ON,
-                        magnitude=np.linalg.norm(ForceVector),
-                        directionVector=((0.0, 0.0, 0.0), tuple(ForceVector / np.linalg.norm(ForceVector))),
-                        amplitude=abqC.UNSET)
+# FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+#                    createStepName=ApplyForceStep.name,
+#                    region=layer.singlepart.GetInstanceFaceRegion(FixedPoint, 0.02))
+#
+# ForceVector = [0.0, 0.0, -5e-2]  # Units of MPa
+#
+# # Call ABAQUS SurfaceTraction method
+# # Again, this came from looking at ABAQUS replay (.rpy) output
+# # Observe again that all ABAQUS symbolic constants need the "abqC"
+# # prefix.
+# FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
+#                         createStepName=ApplyForceStep.name,
+#                         region=layers[0].singlepart.GetInstanceFaceRegionSurface(ForcePoint, 0.1),
+#                         distributionType=abqC.UNIFORM,
+#                         field='',
+#                         localCsys=None,
+#                         traction=abqC.GENERAL,
+#                         follower=abqC.OFF,
+#                         resultant=abqC.ON,
+#                         magnitude=np.linalg.norm(ForceVector),
+#                         directionVector=((0.0, 0.0, 0.0), tuple(ForceVector / np.linalg.norm(ForceVector))),
+#                         amplitude=abqC.UNSET)
 
 # You can have the job auto-start when the Python script is run
 # DM.RunJob(BendingJob)
