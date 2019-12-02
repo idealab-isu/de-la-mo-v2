@@ -1537,7 +1537,7 @@ class LayerMold(object):
         # raise ValueError("Break")
 
         return (cls.FromShell(OrigShell, OrigDirPoint, OrigDirNormal, OrigDirPointTolerance),
-                solid.Solid.FromOCC(os.path.split(solidfilename)[1],OrigSolidShape,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
+                solid.Solid.FromOCC(os.path.split(solidfilename)[1].replace(".","_"),OrigSolidShape,PointTolerance=OrigDirPointTolerance,NormalTolerance=OrigDirNormalTolerance))
     
     @classmethod
     def FromFile(cls,filename,OrigDirPoint=np.array((0.0,0.0,0.0)),OrigDirNormal=np.array((0.0,0.0,1.0)),OrigDirTolerance=1e-6):

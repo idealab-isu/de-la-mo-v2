@@ -121,7 +121,7 @@ previouslayer = None
 layers = []
 
 # Create the flat region
-for layernum in range(10):
+for layernum in range(16):
 
     # Set the thickness for the 2 zones
     if (layernum < 8):
