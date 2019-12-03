@@ -1044,7 +1044,9 @@ class LayerBody(object):
             while FaceExp.More():
                 # Extract the Surface object (geometry, not topology) underlying this face
                 tds_Face = topods_Face(FaceExp.Current())
-                FaceSurf = BRep_Tool.Surface(tds_Face)
+                # Create LayerBodyFace
+                NewLayerBodyFace = LayerBodyFace.FromOCC(tds_Face, "ORIG", Owner=NewLayerBody)
+                # FaceSurf = BRep_Tool.Surface(tds_Face)
 
                 # WARNING: This surface matching trick seems to be rather fragile
                 # ... in particular we have seen these surfaces never match
@@ -1055,23 +1057,21 @@ class LayerBody(object):
                 # Search for this face in the mold
                 MatchedInOrig = False
                 for OrigFace in self.FaceListOrig:  # Iterate over LayerBodyFaces in pre-split LayerBody
-                    OrigFaceSurf = BRep_Tool.Surface(OrigFace.Face)
-                    if OrigFaceSurf == FaceSurf:  # Same underlying surface
+                    if (OCCPointInFace(NewLayerBodyFace.Point, OrigFace.Face, Tolerance) == TopAbs_IN):
                         if MatchedInOrig:
                             raise ValueError("Same surface matched twice in mold (!?)")
                         MatchedInOrig = True
-                        pass
+                        break
                     pass
 
                 # Search for this face in the offset surface
                 MatchedInOffset = False
                 for OffsetFace in self.FaceListOffset:  # Iterate over LayerBodyFaces in pre-split LayerBody
-                    OffsetFaceSurf = BRep_Tool.Surface(OffsetFace.Face)
-                    if OffsetFaceSurf == FaceSurf:  # Same underlying surface
+                    if (OCCPointInFace(NewLayerBodyFace.Point, OffsetFace.Face, Tolerance) == TopAbs_IN):
                         if MatchedInOffset:
                             raise ValueError("Same surface matched twice in offset (!?)")
                         MatchedInOffset = True
-                        pass
+                        break
                     pass
 
                 # Since these faces are extracted from the generated
@@ -1080,19 +1080,18 @@ class LayerBody(object):
                 # provide an IsPointingInside lambda.
 
                 if MatchedInOrig and not (MatchedInOffset):
-                    # Create LayerBodyFace
-                    NewLayerBody.FaceListOrig.append(LayerBodyFace.FromOCC(tds_Face, "ORIG", Owner=NewLayerBody))
+                    NewLayerBodyFace.Direction = "ORIG"
+                    NewLayerBody.FaceListOrig.append(NewLayerBodyFace)
                     pass
                 elif MatchedInOffset and not (MatchedInOrig):
-                    # Create LayerBodyFace
-                    NewLayerBody.FaceListOffset.append(LayerBodyFace.FromOCC(tds_Face, "OFFSET", Owner=NewLayerBody))
+                    NewLayerBodyFace.Direction = "OFFSET"
+                    NewLayerBody.FaceListOffset.append(NewLayerBodyFace)
                     pass
                 elif MatchedInOffset and MatchedInOrig:
                     raise ValueError("Same surface matched in both offset and orig (!?)")
                 else:
-                    # Must be a side face
-                    # Create LayerBodyFace
-                    NewLayerBody.FaceListSide.append(LayerBodyFace.FromOCC(tds_Face, "OFFSET", Owner=NewLayerBody))
+                    NewLayerBodyFace.Direction = "OFFSET"
+                    NewLayerBody.FaceListSide.append(NewLayerBodyFace)
                     pass
                 FaceExp.Next()
                 pass
