@@ -135,7 +135,7 @@ solidmeshsize=15.0 # mm
 # For the moment, model the solid as uniaxial... Should probably build a hybrid stiffness model based on laminate theory
 SolidSection=FEModel.HomogeneousSolidSection(name='LaminaSection',material=CFRPLaminaMat.name,thickness=None)
 
-SolidSolidCoupling.solidpart.MeshSimple(MeshElemTypes, solidmeshsize, abqC.TET, abqC.FREE)
+SolidSolidCoupling.solidpart.MeshSimple(MeshElemTypes, solidmeshsize, ElemShape=abqC.TET, ElemTechnique=abqC.FREE,refined_edges = MoldEdgePointTangents)
 SolidSolidCoupling.solidpart.AssignSection(SolidSection)
 SolidSolidCoupling.solidpart.ApplyLayup(coordsys,0.0) # orientation of 0 means that 0 degrees as defined in the SolidSection layers lines up with the first axis (fiber direction) of the coordsys. 
 

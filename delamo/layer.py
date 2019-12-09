@@ -1619,7 +1619,10 @@ class LayerMold(object):
                 point = gp_Pnt()
                 tangent = gp_Vec()
                 currentCurve.GetObject().D1((start + end)*0.5, point, tangent)
-                PointTangents.append((point,tangent))
+
+                point_tuple = (point.X(),point.Y(),point.Z())
+                tangent_tuple = (tangent.X(),tangent.Y(),tangent.Z())
+                PointTangents.append((point_tuple,tangent_tuple))
 
                 topExplorer.Next()
                 pass
