@@ -103,6 +103,10 @@ thickness2 = (4.57197 - 2.19456)/ 8.0
                                                                           OrigDirNormal=np.array((0.0, 0.0, 1.0)))
 
 
+MoldEdgePointTangents = OrigMold.GetPointTangentsonOuterEdges()
+
+
+
 
 # Define a coordinate system
 # This example defines +x direction along 0 deg. fibers,

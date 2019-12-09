@@ -1596,8 +1596,38 @@ class LayerMold(object):
         return cls.FromShell(Shell)
         #return cls.FromShell(Fuser.Shape())
     
-    pass
+    def GetPointTangentsonOuterEdges(self):
+        """Get points on the outer edges of the mold to be used for setting the default mesh sizing"""
 
+        PointTangents = []
+        FreeCheck = ShapeAnalysis_FreeBoundsProperties(self.Shape)
+        FreeCheck.Perform()
+
+        print("Mold has %d free boundaries." % (FreeCheck.NbClosedFreeBounds()))
+        assert (FreeCheck.NbClosedFreeBounds() >= 1)
+
+
+        for nBoundary in range(1, FreeCheck.NbClosedFreeBounds() + 1):
+            OrigBoundary = FreeCheck.ClosedFreeBound(nBoundary).GetObject()
+            OrigWire = OrigBoundary.FreeBound()
+
+            topExplorer = TopExp_Explorer(OrigWire, TopAbs_EDGE)
+            # iterate over pieces of the original wire
+            while topExplorer.More():
+                curentEdge = topExplorer.Current()
+                (currentCurve, start, end) = BRep_Tool().Curve(topods_Edge(curentEdge))  # Handle_Geom_Curve
+                point = gp_Pnt()
+                tangent = gp_Vec()
+                currentCurve.GetObject().D1((start + end)*0.5, point, tangent)
+                PointTangents.append((point,tangent))
+
+                topExplorer.Next()
+                pass
+            pass
+
+        return PointTangents
+
+    pass
 
 class LayerBodyFace(object): # Formerly LayerSurface
     """The LayerBodyFace represents a TopoDS_Face, one of (potentially) 
