@@ -170,7 +170,7 @@ for layernum in range(16):
     # If it is the 9th layer, then cut the layer
     if (layernum == 8):
         layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
-        layer.gk_layer.RemoveLayerBody(0)
+        layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((0.0, 60.0, 2.19456)), DM.abqpointtolerance)
         pass
 
     layers.append(layer)

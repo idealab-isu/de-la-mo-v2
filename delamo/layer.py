@@ -424,6 +424,20 @@ class Layer(object):
         self.BodyList.pop(bodyNum)
         return None
 
+
+    def RemoveLayerBodyByPointInFace(self, point, Tolerance):
+        """Remove the layer body using the point in any of the boundary faces"""
+
+        bodyNum = 0
+        for layerBody in self.BodyList:
+            if layerBody.PointInAnyFace(point, Tolerance):
+                self.BodyList.pop(bodyNum)
+                break
+            bodyNum += 1
+            pass
+
+        return None
+
     def Split(self, crackWireFile, Tolerance):
         """Split the layer using the crackWire outline"""
 
@@ -835,6 +849,30 @@ class LayerBody(object):
             setattr(self,argname,kwargs[argname])
             pass
         pass
+
+    def PointInAnyFace(self, point, Tolerance):
+        """Return True if the point lies on any of the faces of the layerbody"""
+
+        pointInAnyFace = False
+        for face in self.FaceListOrig:
+            if (OCCPointInFace(point, face.Face, Tolerance) == TopAbs_IN):
+                pointInAnyFace = True
+                break
+            pass
+
+        for face in self.FaceListOffset:
+            if (OCCPointInFace(point, face.Face, Tolerance) == TopAbs_IN):
+                pointInAnyFace = True
+                break
+            pass
+
+        for face in self.FaceListSide:
+            if (OCCPointInFace(point, face.Face, Tolerance) == TopAbs_IN):
+                pointInAnyFace = True
+                break
+            pass
+
+        return pointInAnyFace
 
     def Rebuild_Shape(self):
         # Build/rebuild the .Shape attribute from the Face Lists: FaceListOrig, FaceListOffset, and FaceListSide
