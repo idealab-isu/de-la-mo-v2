@@ -328,7 +328,9 @@ def GetMultipleFaces(facearray,points,pointtolerance):
     
     # Create a resulting facearray by creating a mask from gotfaces
     masknum=long(0)
-    masknum |= (long(1) << gotfaces[0].index)
+    for gotface in gotfaces:
+        masknum |= (long(1) << gotface.index)
+        pass
     
     maskstr=GetMaskStr(masknum)
     result_facearray=facearray.getSequenceFromMask(mask=(maskstr,))
@@ -625,7 +627,9 @@ def GetMultipleEdges(edgearray,vertexarray,points,pointtolerance):
     
     # Create a resulting facearray by creating a mask from gotfaces
     masknum=long(0)
-    masknum |= (long(1) << gotedges[0].index)
+    for gotedge in gotedges:
+        masknum |= (long(1) << gotedge.index)
+        pass
     
     maskstr=GetMaskStr(masknum)
     result_edgearray=edgearray.getSequenceFromMask(mask=(maskstr,))

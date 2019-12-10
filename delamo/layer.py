@@ -1596,10 +1596,10 @@ class LayerMold(object):
         return cls.FromShell(Shell)
         #return cls.FromShell(Fuser.Shape())
     
-    def GetPointTangentsonOuterEdges(self):
+    def GetPointsOnOuterEdges(self):
         """Get points on the outer edges of the mold to be used for setting the default mesh sizing"""
 
-        PointTangents = []
+        Points = []
         FreeCheck = ShapeAnalysis_FreeBoundsProperties(self.Shape)
         FreeCheck.Perform()
 
@@ -1621,14 +1621,14 @@ class LayerMold(object):
                 currentCurve.GetObject().D1((start + end)*0.5, point, tangent)
 
                 point_tuple = (point.X(),point.Y(),point.Z())
-                tangent_tuple = (tangent.X(),tangent.Y(),tangent.Z())
-                PointTangents.append((point_tuple,tangent_tuple))
-
+                #tangent_tuple = (tangent.X(),tangent.Y(),tangent.Z())
+                Points.append(point_tuple)  #((point_tuple,tangent_tuple))
+                
                 topExplorer.Next()
                 pass
             pass
 
-        return PointTangents
+        return Points
 
     pass
 

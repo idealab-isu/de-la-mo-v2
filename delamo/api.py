@@ -789,6 +789,7 @@ The actual implementation is the ABAQUS code in abqfuncs_mesh.py"""
 
         if len(refined_edges) > 0: 
             # edges defined for refinement
+            #print("got refined_edges=%s" % (str(refined_edges)))
             #picked=self.GetPartEdges_ThreePoints(refined_edges,pointtolerance)
             picked=self.GetMultiplePartEdges(refined_edges,pointtolerance)
             self.fe_part_meshing.seedEdgeBySize(edges=picked,size=refinedmeshsize,deviationFactor=0.1,minSizeFactor=0.1,constraint=abqC.FINER)
@@ -1742,7 +1743,7 @@ class solid_solid_coupling(object):
                 # the little subdivided faces as masters
                 # and the big unified face as slave
 
-                name="SolidSolidCoupling_%s_%s_Continuity_%d" % (sideface_adjacency["name1"],sideface_adjacency["name2"],DM.get_unique())
+                name="SSC_%s_%s_Tie_%d" % (sideface_adjacency["name1"],sideface_adjacency["name2"],DM.get_unique())
 
 
                 tie=DM.FEModel.Tie(name=name,

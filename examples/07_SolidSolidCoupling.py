@@ -91,7 +91,7 @@ LaminateAssemblyMeshing = DM.meshinstrs.rewrapobj(LaminateAssembly)
 # Basic parameters
 
 # Set layer thickness for lamina
-# *** MUST BE KEPT IN SYNC WITH 04_Delam_plate_add_damage.py ***
+# *** MUST BE KEPT IN SYNC WITH 07_SolidSolidCoupling_add_damage.py ***
 thickness1 = 2.19456 / 8.0
 thickness2 = (4.57197 - 2.19456)/ 8.0
 
@@ -103,7 +103,7 @@ thickness2 = (4.57197 - 2.19456)/ 8.0
                                                                           OrigDirNormal=np.array((0.0, 0.0, 1.0)))
 
 
-MoldEdgePointTangents = OrigMold.GetPointTangentsonOuterEdges()
+MoldEdgePoints = OrigMold.GetPointsOnOuterEdges()
 
 
 
@@ -135,7 +135,7 @@ solidmeshsize=15.0 # mm
 # For the moment, model the solid as uniaxial... Should probably build a hybrid stiffness model based on laminate theory
 SolidSection=FEModel.HomogeneousSolidSection(name='LaminaSection',material=CFRPLaminaMat.name,thickness=None)
 
-SolidSolidCoupling.solidpart.MeshSimple(MeshElemTypes, solidmeshsize, ElemShape=abqC.TET, ElemTechnique=abqC.FREE,refined_edges = MoldEdgePointTangents)
+SolidSolidCoupling.solidpart.MeshSimple(MeshElemTypes, solidmeshsize, ElemShape=abqC.TET, ElemTechnique=abqC.FREE,refined_edges = MoldEdgePoints,pointtolerance=DM.abqpointtolerance,refinedmeshsize=meshsize)
 SolidSolidCoupling.solidpart.AssignSection(SolidSection)
 SolidSolidCoupling.solidpart.ApplyLayup(coordsys,0.0) # orientation of 0 means that 0 degrees as defined in the SolidSection layers lines up with the first axis (fiber direction) of the coordsys. 
 
@@ -143,10 +143,9 @@ SolidSolidCoupling.solidpart.ApplyLayup(coordsys,0.0) # orientation of 0 means t
 
 
 # Create and add point marker for fixed faced boundary condition
-# There is a surface at y=-25 mm  from z= 0...0.2 mm
 # This point identifies it
-FixedPoint = [0, -107.95, 1.]
-ForcePoint = [0, +107.95, 1.]
+FixedPoint = [0, +107.95, 1.]
+ForcePoint = [0, -107.95, 1.]
 
 Mold = OrigMold
 previouslayer = None
@@ -158,8 +157,11 @@ for layernum in range(16):
     # Set the thickness for the 2 zones
     if (layernum < 8):
         thickness = thickness1
-    else:
+        pass
+    
+    if layernum >= 8: # Avoid using else clause because that triggers a redbaron bug
         thickness = thickness2
+        pass
 
     layer = Layer.CreateFromMold(DM, Mold, "OFFSET", thickness, "Layer_%d" % (layernum + 1), LaminaSection,
                                  layup[layernum], coordsys=coordsys)
@@ -168,7 +170,7 @@ for layernum in range(16):
     # If it is the 9th layer, then cut the layer
     if (layernum == 8):
         layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
-        layer.gk_layer.RemoveLayerBody(1)
+        layer.gk_layer.RemoveLayerBody(0)
         pass
 
     layers.append(layer)
@@ -189,8 +191,7 @@ for layernum in range(16):
 
     # Bond layer to previous layer
     if previouslayer is not None:
-        bond_layers(DM, previouslayer, layer, CohesiveInteraction=CohesiveInteraction,
-                    ContactInteraction=ContactInteraction)
+        bond_layers(DM, previouslayer, layer, CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction)
         pass
 
     # Embed layer in solid
@@ -210,28 +211,29 @@ for layernum in range(16):
 # EncastreBC is an ABAQUS function that was found by
 # using the ABAQUS/CAE interface and then looking at the
 # replay (.rpy) file. 
-# FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
-#                    createStepName=ApplyForceStep.name,
-#                    region=layer.singlepart.GetInstanceFaceRegion(FixedPoint, 0.02))
+FEModel.EncastreBC(name="FixedFace_%d" % (DM.get_unique()),
+                   createStepName=ApplyForceStep.name,
+                   region=SolidSolidCoupling.solidpart.GetInstanceFaceRegion(FixedPoint, 0.02))
+
+
+ForceVector = [0.0, 0.0, -5e-2]  # Units of MPa
 #
-# ForceVector = [0.0, 0.0, -5e-2]  # Units of MPa
-#
-# # Call ABAQUS SurfaceTraction method
-# # Again, this came from looking at ABAQUS replay (.rpy) output
-# # Observe again that all ABAQUS symbolic constants need the "abqC"
-# # prefix.
-# FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
-#                         createStepName=ApplyForceStep.name,
-#                         region=layers[0].singlepart.GetInstanceFaceRegionSurface(ForcePoint, 0.1),
-#                         distributionType=abqC.UNIFORM,
-#                         field='',
-#                         localCsys=None,
-#                         traction=abqC.GENERAL,
-#                         follower=abqC.OFF,
-#                         resultant=abqC.ON,
-#                         magnitude=np.linalg.norm(ForceVector),
-#                         directionVector=((0.0, 0.0, 0.0), tuple(ForceVector / np.linalg.norm(ForceVector))),
-#                         amplitude=abqC.UNSET)
+# Call ABAQUS SurfaceTraction method
+# Again, this came from looking at ABAQUS replay (.rpy) output
+# Observe again that all ABAQUS symbolic constants need the "abqC"
+# prefix.
+FEModel.SurfaceTraction(name="SurfaceTraction_%d" % (DM.get_unique()),
+                        createStepName=ApplyForceStep.name,
+                        region=SolidSolidCoupling.solidpart.GetInstanceFaceRegionSurface(ForcePoint, 0.1),
+                        distributionType=abqC.UNIFORM,
+                        field='',
+                        localCsys=None,
+                        traction=abqC.GENERAL,
+                        follower=abqC.OFF,
+                        resultant=abqC.ON,
+                        magnitude=np.linalg.norm(ForceVector),
+                        directionVector=((0.0, 0.0, 0.0), tuple(ForceVector / np.linalg.norm(ForceVector))),
+                        amplitude=abqC.UNSET)
 
 # You can have the job auto-start when the Python script is run
 # DM.RunJob(BendingJob)
