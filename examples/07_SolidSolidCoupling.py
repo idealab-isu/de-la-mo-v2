@@ -99,7 +99,7 @@ thickness2 = (4.57197 - 2.194565)/ 16.0
                                                                           os.path.join("..", "data", "NASAShellOverwrap.STEP"),
                                                                           os.path.join("..", "data",
                                                                                        "CuttingTool2.STEP"),
-                                                                          OrigDirPoint=np.array((0.0, 60.0, 0.0)),
+                                                                          OrigDirPoint=np.array((200.0, 50.0, 0.0)),
                                                                           OrigDirNormal=np.array((0.0, 0.0, 1.0)))
 
 
@@ -170,7 +170,7 @@ for layernum in range(32):
     # If it is the 9th layer, then cut the layer
     if (layernum == 16):
         layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
-        layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((0.0, 60.0, 2.19456)), DM.abqpointtolerance)
+        layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((200.0, 60.0, 2.19456)), DM.abqpointtolerance)
         pass
 
     layers.append(layer)
