@@ -23,11 +23,12 @@ import scipy.spatial
 
 
 doplots = False
+numLayers = 16
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 07_SolidSolidCoupling.py ***
-thickness1 = 2.194565 / 16.0
-thickness2 = (4.57197 - 2.194565)/ 16.0
+thickness1 = 2.194565 / numLayers
+thickness2 = (4.57197 - 2.194565)/ numLayers
 
 damage_directory = os.path.join("..","data","NASAShellOverwrap_delams")
 output_directory = "07_SolidSolidCoupling_output"
@@ -61,11 +62,11 @@ for damage_filename in damage_filenames:
     
     assert((delam_outline_raw[3,:]==0.0).all()) # surface z coordinate assumed to be zero everywhere
 
-    if delam_layernum < 8:
+    if delam_layernum < numLayers:
         delam_depth = delam_layernum*thickness1
         pass
     else:
-        delam_depth = 8*thickness1 + (delam_layernum-8)*thickness2
+        delam_depth = numLayers*thickness1 + (delam_layernum-numLayers)*thickness2
         pass
 
     delam_coords = np.array((delam_outline_raw[1,:],delam_outline_raw[2,:]),dtype='d') # ,np.ones(delam_outline_raw.shape[1],dtype='d')*delam_depth)

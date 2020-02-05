@@ -92,8 +92,9 @@ LaminateAssemblyMeshing = DM.meshinstrs.rewrapobj(LaminateAssembly)
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 07_SolidSolidCoupling_add_damage.py ***
-thickness1 = 2.194565 / 16.0
-thickness2 = (4.57197 - 2.194565)/ 16.0
+numLayers = 16
+thickness1 = 2.194565 / numLayers
+thickness2 = (4.57197 - 2.194565)/ numLayers
 
 (OrigMold, SolidSolidCoupling) = solid_solid_coupling.from_solid_and_tool(DM,
                                                                           os.path.join("..", "data", "NASAShellOverwrap.STEP"),
@@ -155,11 +156,11 @@ layers = []
 for layernum in range(32):
 
     # Set the thickness for the 2 zones
-    if (layernum < 16):
+    if (layernum < numLayers):
         thickness = thickness1
         pass
     
-    if layernum >= 16: # Avoid using else clause because that triggers a redbaron bug
+    if layernum >= numLayers: # Avoid using else clause because that triggers a redbaron bug
         thickness = thickness2
         pass
 
@@ -168,7 +169,7 @@ for layernum in range(32):
 
 
     # If it is the 9th layer, then cut the layer
-    if (layernum == 16):
+    if (layernum == numLayers):
         layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
         layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((200.0, 60.0, 2.19456)), DM.abqpointtolerance)
         pass
