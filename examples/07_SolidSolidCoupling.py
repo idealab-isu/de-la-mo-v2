@@ -92,8 +92,8 @@ LaminateAssemblyMeshing = DM.meshinstrs.rewrapobj(LaminateAssembly)
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 07_SolidSolidCoupling_add_damage.py ***
-thickness1 = 2.19456 / 8.0
-thickness2 = (4.57197 - 2.19456)/ 8.0
+thickness1 = 2.194565 / 16.0
+thickness2 = (4.57197 - 2.194565)/ 16.0
 
 (OrigMold, SolidSolidCoupling) = solid_solid_coupling.from_solid_and_tool(DM,
                                                                           os.path.join("..", "data", "NASAShellOverwrap.STEP"),
@@ -114,7 +114,7 @@ MoldEdgePoints = OrigMold.GetPointsOnOuterEdges()
 # the default (when coordsys is not specified)
 coordsys = SimpleCoordSys((1.0, 0.0, 0.0), (0.0, 1.0, 0.0))
 
-layup = [0, 45, -45, 90, 90, -45, 45, 0, 0, 45, -45, 90, 90, -45, 45, 0]  # assumed layup
+layup = [0, 45, -45, 90, 90, -45, 45, 0, 0, 45, -45, 90, 90, -45, 45, 0, 0, 45, -45, 90, 90, -45, 45, 0, 0, 45, -45, 90, 90, -45, 45, 0 ]  # assumed layup
 
 
 
@@ -152,14 +152,14 @@ previouslayer = None
 layers = []
 
 # Create the flat region
-for layernum in range(16):
+for layernum in range(32):
 
     # Set the thickness for the 2 zones
-    if (layernum < 8):
+    if (layernum < 16):
         thickness = thickness1
         pass
     
-    if layernum >= 8: # Avoid using else clause because that triggers a redbaron bug
+    if layernum >= 16: # Avoid using else clause because that triggers a redbaron bug
         thickness = thickness2
         pass
 
@@ -168,7 +168,7 @@ for layernum in range(16):
 
 
     # If it is the 9th layer, then cut the layer
-    if (layernum == 8):
+    if (layernum == 16):
         layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
         layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((0.0, 60.0, 2.19456)), DM.abqpointtolerance)
         pass

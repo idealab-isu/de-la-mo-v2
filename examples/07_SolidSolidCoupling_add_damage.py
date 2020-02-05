@@ -26,8 +26,8 @@ doplots = False
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 07_SolidSolidCoupling.py ***
-thickness1 = 2.19456 / 8.0
-thickness2 = (4.57197 - 2.19456)/ 8.0
+thickness1 = 2.194565 / 16.0
+thickness2 = (4.57197 - 2.194565)/ 16.0
 
 damage_directory = os.path.join("..","data","NASAShellOverwrap_delams")
 output_directory = "07_SolidSolidCoupling_output"
