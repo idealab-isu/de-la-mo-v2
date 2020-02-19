@@ -92,7 +92,7 @@ LaminateAssemblyMeshing = DM.meshinstrs.rewrapobj(LaminateAssembly)
 
 # Set layer thickness for lamina
 # *** MUST BE KEPT IN SYNC WITH 07_SolidSolidCoupling_add_damage.py ***
-numLayers = 16
+numLayers = 8  # If updated must also update loop limit, below
 thickness1 = 2.194565 / numLayers
 thickness2 = (4.57197 - 2.194565)/ numLayers
 
@@ -100,7 +100,7 @@ thickness2 = (4.57197 - 2.194565)/ numLayers
                                                                           os.path.join("..", "data", "NASAShellOverwrap.STEP"),
                                                                           os.path.join("..", "data",
                                                                                        "CuttingTool2.STEP"),
-                                                                          OrigDirPoint=np.array((200.0, 50.0, 0.0)),
+                                                                          OrigDirPoint=np.array((-200.0, 50.0, 0.0)),
                                                                           OrigDirNormal=np.array((0.0, 0.0, 1.0)))
 
 
@@ -153,7 +153,7 @@ previouslayer = None
 layers = []
 
 # Create the flat region
-for layernum in range(32):
+for layernum in range(16):  # Iteration limit should match numLayers*2 but must be a constant so that loop unwrapping can work
 
     # Set the thickness for the 2 zones
     if (layernum < numLayers):
@@ -171,7 +171,7 @@ for layernum in range(32):
     # If it is the 9th layer, then cut the layer
     if (layernum == numLayers):
         layer.Split(os.path.join("..", "data", "SplitLineNASA.csv"), DM.abqpointtolerance)
-        layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((200.0, 60.0, 2.19456)), DM.abqpointtolerance)
+        layer.gk_layer.RemoveLayerBodyByPointInFace(np.array((-200.0, 60.0, 2.19456)), DM.abqpointtolerance)
         pass
 
     layers.append(layer)
@@ -187,9 +187,16 @@ for layernum in range(32):
     # and minsizefactor. and refines the mesh near any given refined_edges
 
     # Note that ABAQUS constants must be referenced as part of abqC
-    # rather than used directly 
-    layer.MeshSimple(MeshElemTypes, meshsize, abqC.HEX_DOMINATED, abqC.SYSTEM_ASSIGN)
+    # rather than used directly
 
+    # Here layer #7 (0-based) has delaminations on both sides so it must be Tet-meshed
+    if layernum==7:
+        layer.MeshSimple(MeshElemTypes, meshsize, abqC.TET, abqC.SYSTEM_ASSIGN)
+        pass
+    else:
+        layer.MeshSimple(MeshElemTypes, meshsize, abqC.HEX_DOMINATED, abqC.SYSTEM_ASSIGN)
+        pass
+    
     # Bond layer to previous layer
     if previouslayer is not None:
         bond_layers(DM, previouslayer, layer, CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction)
