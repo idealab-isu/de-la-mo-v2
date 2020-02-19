@@ -191,7 +191,7 @@ for layernum in range(16):  # Iteration limit should match numLayers*2 but must 
 
     # Here layer #7 (0-based) has delaminations on both sides so it must be Tet-meshed
     if layernum==7:
-        layer.MeshSimple(MeshElemTypes, meshsize, abqC.TET, abqC.SYSTEM_ASSIGN)
+        layer.MeshSimple(MeshElemTypes, meshsize, abqC.TET, abqC.FREE)
         pass
 
     if layernum != 7:
