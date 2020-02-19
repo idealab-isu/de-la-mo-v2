@@ -193,7 +193,8 @@ for layernum in range(16):  # Iteration limit should match numLayers*2 but must 
     if layernum==7:
         layer.MeshSimple(MeshElemTypes, meshsize, abqC.TET, abqC.SYSTEM_ASSIGN)
         pass
-    else:
+
+    if layernum != 7:
         layer.MeshSimple(MeshElemTypes, meshsize, abqC.HEX_DOMINATED, abqC.SYSTEM_ASSIGN)
         pass
     

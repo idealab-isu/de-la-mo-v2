@@ -1783,7 +1783,7 @@ class solid_solid_coupling(object):
 # variables in processor.py
 # *** ALSO NEED TO CHANGE CODE in processor.py/annotate_bond_layers_calls
 # *** WHERE "basename" and "phase" parameters
-def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="NONE",CohesiveInteraction=None,ContactInteraction=None,delaminationlist=None,master_layer=None,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None):
+def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="NONE",delamSurroundingBC="COHESIVE",CohesiveInteraction=None,ContactInteraction=None,delaminationlist=None,master_layer=None,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None):
     """Bond two layers together. Parameters:
 * DM: DelamoModeler object
 * layer1: First layer
@@ -1791,6 +1791,7 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
 * defaultBC: The boundary condition for the bonded zone: Generally "TIE", "COHESIVE", or "COHESIVE_LAYER"
 * delamBC: The boundary condition for the bulk of the delaminated region(s). Generally  "CONTACT"
 * delamRingBC: The boundary condition for the outer zone of the delaminated region: Generally "NONE"
+* delamSurroundingBC: The boundary condition for the non-delaminated region of a delaminated layer: Generally "COHESIVE"
 * CohesiveInteraction: The ABAQUS interaction property for any cohesive portions of the bond
 * ContactInteraction: The ABAQUS interaction property for any contact portions of the bond
 * delaminationlist: A list of files with delamination outlines (loops of 3D coordinates)
@@ -1852,13 +1853,13 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
         # Now call ourselves to create TIE bond between layer1 and cohesive_layer, except in the delaminated region
 
         # BCTypes have already been written to layer1 and cohesive_layer by adjacent_layer_boundary_conditions() call above
-        bond_layers(DM,layer1,cohesive_layer,defaultBC="TIE",delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer1,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
+        bond_layers(DM,layer1,cohesive_layer,defaultBC="TIE",delamSurroundingBC="TIE",delamBC=delamBC,delamRingBC=delamRingBC,CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer1,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
 
         
         
         # Now call ourselves to create TIE bond between cohesive_layer and layer2, even in the delaminated region
         # because CONTACT/NONE will exist between layer1 and cohesive_layer
-        bond_layers(DM,cohesive_layer,layer2,defaultBC="TIE",delamBC="TIE",delamRingBC="TIE",CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer2,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
+        bond_layers(DM,cohesive_layer,layer2,defaultBC="TIE",delamSurroundingBC="TIE",delamBC="TIE",delamRingBC="TIE",CohesiveInteraction=CohesiveInteraction,ContactInteraction=ContactInteraction,delaminationlist=None,master_layer=layer2,cohesive_layer=None,delamo_sourceline=None,delamo_phase=None,delamo_basename=None)
         
         return
 
@@ -1875,9 +1876,14 @@ def bond_layers(DM,layer1,layer2,defaultBC="TIE",delamBC="CONTACT",delamRingBC="
     if delaminationlist is not None:
         DM.modelbuilder.apply_delaminations(layer1.gk_layer,layer2.gk_layer,delaminationlist)
         pass
-    
-    face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
-    
+
+    if delaminationlist is not None and len(delaminationlist) > 0:
+        # Use delamSurroundingBC in place of defaultBC
+        face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": delamSurroundingBC, "CONTACT": delamBC, "NONE": delamRingBC })
+        pass
+    else:
+        face_adjacency_list = DM.modelbuilder.adjacent_layer_boundary_conditions(layer1.gk_layer,layer2.gk_layer,bc_map={ "TIE": defaultBC, "CONTACT": delamBC, "NONE": delamRingBC })
+        pass
 
     # Can not bond non-existant objects
     ThisContact = LaminaContact(DM=DM,bottomlamina=layer1, toplamina=layer2)
