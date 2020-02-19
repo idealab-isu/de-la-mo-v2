@@ -1747,8 +1747,8 @@ class solid_solid_coupling(object):
 
 
                 tie=DM.FEModel.Tie(name=name,
-                                master=layersideregion,
-                                slave=solidregion,
+                                master=solidregion,
+                                slave=layersideregion,
                                 positionToleranceMethod=abqC.COMPUTED,
                                 adjust=abqC.ON,
                                 tieRotations=abqC.ON,
