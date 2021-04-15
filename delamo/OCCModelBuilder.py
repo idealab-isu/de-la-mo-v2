@@ -53,6 +53,7 @@ if use_OCC_core:
     from OCC.Core import BRepOffset
     from OCC.Core.Geom import Geom_OffsetCurve
     from OCC.Core.Geom import Geom_Curve
+    from OCC.Core.Geom import Geom_Surface
     from OCC.Core import BRepBuilderAPI
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeWire
@@ -139,6 +140,7 @@ else: # !use_OCC_core
     from OCC import BRepOffset
     from OCC.Geom import Geom_OffsetCurve
     from OCC.Geom import Geom_Curve
+    from OCC.Geom import Geom_Surface
     from OCC import BRepBuilderAPI
     from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
     from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
@@ -274,10 +276,13 @@ def CreateReferenceFace(edges, face, scale, tolerance):
         edgefixer = ShapeFix_Edge()
         edgefixer.FixAddPCurve(edge, face, False)
 
-        (curveHandle, parStart, parEnd) = BRep_Tool().CurveOnSurface(edge, face)
+        (curve, parStart, parEnd) = BRep_Tool().CurveOnSurface(edge, face)
         #print(parStart, parEnd)
 
-        curve = curveHandle.GetObject()
+        if not hasattr(curve,"Value"):
+            curve = curve.GetObject() # backward compatibility
+            pass
+        
         for indU in range(numEdgePoints):
             u = indU * (1.0 / numEdgePoints) * (parEnd - parStart) + parStart
             curvePoint = curve.Value(u)
@@ -298,8 +303,12 @@ def CreateReferenceFace(edges, face, scale, tolerance):
         parPointsHArray.SetValue(pos + 1, current_point)
         pass
 
+    if hasattr(parPointsHArray,"GetHandle"): # Backward compatibility
+        parPointsHArray=parPointsHArray.GetHandle()
+        pass
+    
     # Interpolate the points to make a closed curve
-    interpAPI = GeomAPI_Interpolate(parPointsHArray.GetHandle(), False, tolerance)
+    interpAPI = GeomAPI_Interpolate(parPointsHArray, False, tolerance)
     interpAPI.Perform()
     if interpAPI.IsDone():
         delam_par_curve = interpAPI.Curve()
@@ -373,26 +382,34 @@ def CreateDelaminationWire(delam_outline, tolerance):
         delam_outpointsHArray.SetValue(pos + 1, current_point)
         pass
 
+    if hasattr(delam_outpointsHArray,"GetHandle"): # Backward compatibility
+        delm_outpointsHArray=delam_outpointsHArray.GetHandle()
+        pass
+
     # Interpolate the points to make a closed curve
-    interpAPI = GeomAPI_Interpolate(delam_outpointsHArray.GetHandle(), True, tolerance)
+    interpAPI = GeomAPI_Interpolate(delam_outpointsHArray, True, tolerance)
     interpAPI.Perform()
     if interpAPI.IsDone():
         delam_curve = interpAPI.Curve()
     else:
         raise ValueError("Curve interpolation failed\n")
 
-
+    if not hasattr(delam_curve,"FirstParameter"):
+        # Backwards Compatibility with old pythonocc
+        delam_curve = delam_curve.GetObject()
+        pass
+    
     # Analyze the delam_curve for minimum curvature
     numPts = 500
-    uStart = delam_curve.GetObject().FirstParameter()
-    uEnd = delam_curve.GetObject().LastParameter()
+    uStart = delam_curve.FirstParameter()
+    uEnd = delam_curve.LastParameter()
     minCurvature = 100
     for i in range(numPts):
         u = i/(numPts*(uEnd-uStart)) + uStart
         p = gp_Pnt(0,0,0)
         v1 = gp_Vec(0,0,0)
         v2 = gp_Vec(0,0,0)
-        delam_curve.GetObject().D2(u,p,v1,v2)
+        delam_curve.D2(u,p,v1,v2)
         currentCurvature = v2.Magnitude()
 
         if (currentCurvature < minCurvature):
@@ -1263,12 +1280,16 @@ class OCCModelBuilder(object):
         
         SurfaceDict1={}
         for face in layer1FaceList:
-            # OpenCascade surface provides a DumpToString method
+            # OpenCascade surface provides a DumpToString/DumpJsonToString method
             # that gives a (presumably unique) identification of the
             # underlying surface. The string is hashable, so usable
             # as a dictionary key
-            key = BRep_Tool().Surface(face.Face).DumpToString()
-
+            if hasattr(Geom_Surface,"DumptoString"):
+                key = BRep_Tool().Surface(face.Face).DumpToString()
+                pass
+            else:
+                key = BRep_Tool().Surface(face.Face).DumpJsonToString()
+                pass
             if key not in SurfaceDict1:
                 SurfaceDict1[key]=[]
                 pass
@@ -1278,12 +1299,17 @@ class OCCModelBuilder(object):
         
         SurfaceDict2={}
         for face in layer2FaceList:
-            # OpenCascade surface provides a DumpToString method
+            # OpenCascade surface provides a DumpToString/DumpJsonToString method
             # that gives a (presumably unique) identification of the
             # underlying surface. The string is hashable, so usable
             # as a dictionary key
-            key = BRep_Tool().Surface(face.Face).DumpToString()
-
+            if hasattr(Geom_Surface,"DumptoString"):
+                key = BRep_Tool().Surface(face.Face).DumpToString()
+                pass
+            else:
+                key = BRep_Tool().Surface(face.Face).DumpJsonToString()
+                pass
+            
             if key not in SurfaceDict2:
                 SurfaceDict2[key]=[]
                 pass

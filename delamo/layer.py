@@ -265,15 +265,32 @@ def Tessellate(Object, Shape, MeshSize):
 
     mesher = BRepMesh_IncrementalMesh()
     mesher.SetShape(Shape)
-    mesher.SetAngle(0.01)
-    mesher.SetControlSurfaceDeflection(True)
-    mesher.SetDeflection(0.001 * currentModelSize)
-    mesher.SetParallel(True)
-    mesher.SetInternalVerticesMode(True)
-    mesher.SetMinSize(0.005 * currentModelSize)
-    mesher.SetRelative(False)
-    mesher.Perform()
+    if not hasattr(mesher,"SetAngle"):
+        # New API: Use mesher.ChangeParameters()
+        MesherParams=mesher.ChangeParameters()
+        MesherParams.Angle=0.01
+        MesherParams.ControlSurfaceDeflection=True
+        MesherParams.Deflection=0.001 * currentModelSize
+        MesherParams.Parallel=True
+        MesherParams.InternalVerticesMode=True
+        MesherParams.MinSize = 0.005 * currentModelSize
+        MesherParams.Relative=False
 
+        # make sure that parameters were written correctly
+        assert(abs(mesher.Parameters().Angle-0.01)<1e-6)
+        pass
+    else:
+        # Old API
+        mesher.SetAngle(0.01)
+        mesher.SetControlSurfaceDeflection(True)
+        mesher.SetDeflection(0.001 * currentModelSize)
+        mesher.SetParallel(True)
+        mesher.SetInternalVerticesMode(True)
+        mesher.SetMinSize(0.005 * currentModelSize)
+        mesher.SetRelative(False)
+        pass
+    mesher.Perform()
+    
     return meshMaxSize
 
 
@@ -631,7 +648,13 @@ class Layer(object):
         bRepBuilder.MakeCompound(perimeter)
 
         for nBoundary in range(1, FreeCheck.NbClosedFreeBounds() + 1):
-            OrigBoundary = FreeCheck.ClosedFreeBound(nBoundary).GetObject()
+            OrigBoundary = FreeCheck.ClosedFreeBound(nBoundary)
+
+            # Backwards compatibility
+            if not hasattr(OrigBoundary,"FreeBound"):
+                OrigBoundary=OrigBoundary.GetObject()
+                pass
+
             OrigWire = OrigBoundary.FreeBound()
             
             # Offset edges (alone?)
@@ -828,7 +851,13 @@ class Layer(object):
             objFace.bBoxMax[2] = bBoxMinZ + faceOffset
 
             L = TopLoc_Location()
-            faceTriangulation = BRep_Tool().Triangulation(tds_Face, L).GetObject()
+            faceTriangulation = BRep_Tool().Triangulation(tds_Face, L)
+
+            # Backward compatibility:
+            if not hasattr(faceTriangulation,"NbTriangles"):
+                faceTriangulation=faceTriangulation.GetObject()
+                pass
+            
             numTriangles = faceTriangulation.NbTriangles()
             numVertices = faceTriangulation.NbNodes()
 
@@ -1053,8 +1082,12 @@ class LayerBody(object):
             crack_wirepointsHArray.SetValue(pos + 1, current_point)
             pass
 
+        if hasattr(crack_wirepointsHArray,"GetHandle"): # Backward compatibility with old pythonocc
+            crack_wirepointsHarray=crack_wirepointsHArray.GetHandle()
+            pass
+        
         # Interpolate the points to make a closed curve
-        interpAPI = GeomAPI_Interpolate(crack_wirepointsHArray.GetHandle(), False, Tolerance)
+        interpAPI = GeomAPI_Interpolate(crack_wirepointsHArray, False, Tolerance)
         interpAPI.Perform()
         if interpAPI.IsDone():
             crack_curve = interpAPI.Curve()
@@ -1288,10 +1321,15 @@ class LayerBody(object):
 
                 intersection_edge = edge_list[0]
                 (intersection_curve, start, end) = BRep_Tool().Curve(intersection_edge)  # Handle_Geom_Curve
+
+                if not hasattr(intersection_curve,"D1"):
+                    intersection_curve=intersection_curve.GetObject()
+                    pass
+                
                 #point = intersection_curve.GetObject().Value((start + end)*0.5) # gp_Pnt
                 point = gp_Pnt()
                 tangent = gp_Vec()
-                intersection_curve.GetObject().D1((start + end)*0.5, point, tangent)
+                intersection_curve.D1((start + end)*0.5, point, tangent)
                 break
         else:
             # Only one side face
@@ -1307,9 +1345,13 @@ class LayerBody(object):
                 if (not vertex1.IsSame(vertex2)):
                     (intersection_curve, start, end) = BRep_Tool().Curve(edge)  # Handle_Geom_Curve
                     # point = intersection_curve.GetObject().Value((start + end)*0.5) # gp_Pnt
+                    if not hasattr(intersection_curve,"D1"):
+                        intersection_curve=intersection_curve.GetObject()
+                        pass
+
                     point = gp_Pnt()
                     tangent = gp_Vec()
-                    intersection_curve.GetObject().D1((start + end) * 0.5, point, tangent)
+                    intersection_curve.D1((start + end) * 0.5, point, tangent)
                     break
 
                 EdgeExplorer.Next()
@@ -1752,7 +1794,14 @@ class LayerMold(object):
 
 
         for nBoundary in range(1, FreeCheck.NbClosedFreeBounds() + 1):
-            OrigBoundary = FreeCheck.ClosedFreeBound(nBoundary).GetObject()
+
+            OrigBoundary = FreeCheck.ClosedFreeBound(nBoundary)
+
+            # Backwards compatibility
+            if not hasattr(OrigBoundary,"FreeBound"):
+                OrigBoundary=OrigBoundary.GetObject()
+                pass
+            
             OrigWire = OrigBoundary.FreeBound()
 
             topExplorer = TopExp_Explorer(OrigWire, TopAbs_EDGE)
@@ -1762,7 +1811,12 @@ class LayerMold(object):
                 (currentCurve, start, end) = BRep_Tool().Curve(topods_Edge(curentEdge))  # Handle_Geom_Curve
                 point = gp_Pnt()
                 tangent = gp_Vec()
-                currentCurve.GetObject().D1((start + end)*0.5, point, tangent)
+
+                if not hasattr(currentCurve,"D1"):
+                    currentCurve=currentCurve.GetObject()
+                    pass
+
+                currentCurve.D1((start + end)*0.5, point, tangent)
 
                 point_tuple = (point.X(),point.Y(),point.Z())
                 #tangent_tuple = (tangent.X(),tangent.Y(),tangent.Z())

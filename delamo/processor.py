@@ -127,6 +127,25 @@ def troubleshoot_bond_layers(rb_tree):
     pass
 
 
+def quote_string(s):
+    # Ref: "String and Byte Literals in https://docs.python.org/3/reference/lexical_analysis.html
+    outlist = ["\""]
+
+    for chr in s:
+        if chr == "\"":
+            chr = "\\\"" # escaped double quote
+            pass
+        elif chr == "\\":
+            chr = "\\\\" # escaped backslash
+            pass
+        elif chr == "\n":
+            chr = "\\n" # escaped newline
+            pass
+        outlist.append(chr)
+        pass
+    outlist.append("\"")
+    return "".join(outlist)
+
 
 def unwrap_loops(rb_tree):
 
@@ -243,6 +262,9 @@ def annotate_bond_layers_calls(basename,basename_withpath,output_directory,phase
 
         insertpos=last_kwarg_index(callnode)
 
+        #import pdb
+        #pdb.set_trace()
+        
         linearg = callnode.value.find("callargument",lambda node: node.target is not None and node.target.value=="delamo_sourceline")
         if linearg is not None:
             # already have a kwarg for delamo_sourceline
@@ -274,7 +296,7 @@ def annotate_bond_layers_calls(basename,basename_withpath,output_directory,phase
                                                                "first_formatting": [],
                                                                "second_formatting": [],
                                                                "type": "string",
-                                                               "value": "\"%s\"" % (basename.encode('unicode_escape'))}})
+                                                               "value": "%s" % (quote_string(basename))}})
         
             #delamo_basename_arg.value=copy.deepcopy(basename_value)
             callnode.value.insert(insertpos,delamo_basename_arg)
@@ -290,7 +312,7 @@ def annotate_bond_layers_calls(basename,basename_withpath,output_directory,phase
                                                             "first_formatting": [],
                                                             "second_formatting": [],
                                                             "type": "string",
-                                                            "value": "\"%s\"" % (phase.encode('unicode_escape')) }})
+                                                            "value": "%s" % (quote_string(phase)) }})
             #delamo_phase_arg.value=copy.deepcopy(phase_value)
             callnode.value.insert(insertpos,delamo_phase_arg)
             pass
@@ -417,7 +439,7 @@ def add_delams_to_bond_layers_calls(basename,basename_withpath,output_directory,
             for (delamdir, delamfile, (linenumber, index_or_None) ) in delam_tuples:
                 # add this to the delamination list
 
-                delaminationlist.value.insert(len(delaminationlist.value),redbaron.StringNode({"type": "string", "value": "\""+os.path.join(delamdir,delamfile).encode('unicode_escape')+"\"", 'first_formatting': [], 'second_formatting': []}))
+                delaminationlist.value.insert(len(delaminationlist.value),redbaron.StringNode({"type": "string", "value": quote_string(os.path.join(delamdir,delamfile)), 'first_formatting': [], 'second_formatting': []}))
                 pass
             
             # Remove from delams_by_linenumber to indicate we've handled these files
@@ -447,7 +469,7 @@ def add_delams_to_bond_layers_calls(basename,basename_withpath,output_directory,
                                                         "first_formatting": [],
                                                         "second_formatting": [],
                                                         "type": "name",
-                                                        "value": "\"%s\"" % (phase.encode('unicode_escape'))}})
+                                                        "value": "%s" % (quote_string(phase))}})
 
 
         

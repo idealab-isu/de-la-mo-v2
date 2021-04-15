@@ -244,7 +244,8 @@ class Solid(object):
 
         BooleanOp.Build()
 
-        if BooleanOp.ErrorStatus() != 0:
+        if ((hasattr(BooleanOp,"ErrorStatus") and BooleanOp.ErrorStatus() != 0) or
+            BooleanOp.HasErrors()):
             raise ValueError("Error in subtraction boolean operation")
 
         BooleanResult=BooleanOp.Shape()
