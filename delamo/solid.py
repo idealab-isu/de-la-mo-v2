@@ -8,86 +8,182 @@ import csv
 import numpy as np
 import math
 
-from OCC.TopoDS import topods
 
-from OCC.TopoDS import TopoDS_Face
-from OCC.TopoDS import TopoDS_Shape
-from OCC.TopoDS import TopoDS_Compound
-from OCC.TopoDS import TopoDS_Wire
-from OCC.TopoDS import TopoDS_Vertex
-from OCC.TopoDS import TopoDS_Shell
-from OCC.TopoDS import TopoDS_Solid
-from OCC.TopoDS import topods_Shell
-from OCC.TopoDS import topods_Face
-from OCC.TopoDS import topods_Edge
-from OCC.TopoDS import topods_Vertex
-from OCC.BRep import BRep_Builder
-from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
-from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
-from OCC.BRep import BRep_Tool
-from OCC.BRepExtrema import BRepExtrema_DistShapeShape
-from OCC import BRepLib
-from OCC.BRepLib import BRepLib_FuseEdges
-from OCC import BRepOffsetAPI
-from OCC import BRepOffset
-from OCC import BRepFeat
-from OCC import BRepBuilderAPI
-#from OCC.BRepClass import BRepClass_FacePassiveClassifier
-from OCC.BRepClass import BRepClass_FaceExplorer
-from OCC.BRepClass import BRepClass_FClassifier
-from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
-from OCC.ShapeAnalysis import ShapeAnalysis_FreeBounds
-from OCC.ShapeAnalysis import ShapeAnalysis_Surface
-from OCC.BRepTools import breptools_Read
-from OCC.TopExp import TopExp_Explorer
-from OCC.TopAbs import TopAbs_ON
-from OCC.TopAbs import TopAbs_IN
-from OCC.TopAbs import TopAbs_OUT
-from OCC.TopAbs import TopAbs_FACE
-from OCC.TopAbs import TopAbs_VERTEX
-from OCC.TopAbs import TopAbs_EDGE
-from OCC.TopAbs import TopAbs_SHELL
-from OCC.TopAbs import TopAbs_SOLID
-from OCC.TopAbs import TopAbs_FORWARD
-from OCC.TopAbs import TopAbs_REVERSED
-from OCC.GeomAbs import GeomAbs_Arc
-from OCC.TopTools import TopTools_ListIteratorOfListOfShape
-from OCC.TopTools import TopTools_ListOfShape
-from OCC.TopoDS import TopoDS_Iterator
-from OCC.GeomLProp import GeomLProp_SLProps
-from OCC.gp import gp_Pnt2d
-from OCC.gp import gp_Vec
-from OCC.gp import gp_Dir
-from OCC.gp import gp_Pnt
-from OCC.GEOMAlgo import GEOMAlgo_Splitter
-from OCC import GeomProjLib
-from OCC.TColgp import TColgp_Array1OfPnt
-from OCC.TColgp import TColgp_HArray1OfPnt
-from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
-from OCC.BRepAlgoAPI import BRepAlgoAPI_Section
-from OCC.GProp import GProp_GProps
-from OCC.BRepGProp import brepgprop_SurfaceProperties
-from OCC.BRepGProp import brepgprop_VolumeProperties
+# Old pythonocc defined core functionality directly in OCC
+# New pythonocc defines it in OCC.core
+use_OCC_core=False
+try:
+    import OCC.TopoDS
+    pass
+except ImportError:
+    use_OCC_core=True
+    pass
 
-from OCC.BRepMesh import BRepMesh_IncrementalMesh
-from OCC.Bnd import Bnd_Box
-from OCC.BRepBndLib import brepbndlib_Add
-from OCC.TopLoc import TopLoc_Location
+if use_OCC_core:
 
-from OCC.BRepTools import breptools_Read
-from OCC.BRepTools import breptools_Write
-from OCC.STEPControl import STEPControl_Reader
-from OCC.STEPControl import STEPControl_Writer
-from OCC.STEPControl import STEPControl_ShellBasedSurfaceModel
-from OCC.STEPControl import STEPControl_ManifoldSolidBrep
-from OCC.STEPControl import STEPControl_GeometricCurveSet
-from OCC.IGESControl import IGESControl_Reader
-from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
+    from OCC.Core.TopoDS import topods
+    
+    from OCC.Core.TopoDS import TopoDS_Face
+    from OCC.Core.TopoDS import TopoDS_Shape
+    from OCC.Core.TopoDS import TopoDS_Compound
+    from OCC.Core.TopoDS import TopoDS_Wire
+    from OCC.Core.TopoDS import TopoDS_Vertex
+    from OCC.Core.TopoDS import TopoDS_Shell
+    from OCC.Core.TopoDS import TopoDS_Solid
+    from OCC.Core.TopoDS import topods_Shell
+    from OCC.Core.TopoDS import topods_Face
+    from OCC.Core.TopoDS import topods_Edge
+    from OCC.Core.TopoDS import topods_Vertex
+    from OCC.Core.BRep import BRep_Builder
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeWire
+    from OCC.Core.BRep import BRep_Tool
+    from OCC.Core.BRepExtrema import BRepExtrema_DistShapeShape
+    from OCC.Core import BRepLib
+    from OCC.Core.BRepLib import BRepLib_FuseEdges
+    from OCC.Core import BRepOffsetAPI
+    from OCC.Core import BRepOffset
+    from OCC.Core import BRepFeat
+    from OCC.Core import BRepBuilderAPI
+    #from OCC.Core.BRepClass import BRepClass_FacePassiveClassifier
+    from OCC.Core.BRepClass import BRepClass_FaceExplorer
+    from OCC.Core.BRepClass import BRepClass_FClassifier
+    from OCC.Core.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
+    from OCC.Core.ShapeAnalysis import ShapeAnalysis_FreeBounds
+    from OCC.Core.ShapeAnalysis import ShapeAnalysis_Surface
+    from OCC.Core.BRepTools import breptools_Read
+    from OCC.Core.TopExp import TopExp_Explorer
+    from OCC.Core.TopAbs import TopAbs_ON
+    from OCC.Core.TopAbs import TopAbs_IN
+    from OCC.Core.TopAbs import TopAbs_OUT
+    from OCC.Core.TopAbs import TopAbs_FACE
+    from OCC.Core.TopAbs import TopAbs_VERTEX
+    from OCC.Core.TopAbs import TopAbs_EDGE
+    from OCC.Core.TopAbs import TopAbs_SHELL
+    from OCC.Core.TopAbs import TopAbs_SOLID
+    from OCC.Core.TopAbs import TopAbs_FORWARD
+    from OCC.Core.TopAbs import TopAbs_REVERSED
+    from OCC.Core.GeomAbs import GeomAbs_Arc
+    from OCC.Core.TopTools import TopTools_ListIteratorOfListOfShape
+    from OCC.Core.TopTools import TopTools_ListOfShape
+    from OCC.Core.TopoDS import TopoDS_Iterator
+    from OCC.Core.GeomLProp import GeomLProp_SLProps
+    from OCC.Core.gp import gp_Pnt2d
+    from OCC.Core.gp import gp_Vec
+    from OCC.Core.gp import gp_Dir
+    from OCC.Core.gp import gp_Pnt
+    from OCC.Core import GeomProjLib
+    from OCC.Core.TColgp import TColgp_Array1OfPnt
+    from OCC.Core.TColgp import TColgp_HArray1OfPnt
+    from OCC.Core.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Section
+    from OCC.Core.GProp import GProp_GProps
+    from OCC.Core.BRepGProp import brepgprop_SurfaceProperties
+    from OCC.Core.BRepGProp import brepgprop_VolumeProperties
+    
+    from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+    from OCC.Core.Bnd import Bnd_Box
+    from OCC.Core.BRepBndLib import brepbndlib_Add
+    from OCC.Core.TopLoc import TopLoc_Location
+    
+    from OCC.Core.BRepTools import breptools_Read
+    from OCC.Core.BRepTools import breptools_Write
+    from OCC.Core.STEPControl import STEPControl_Reader
+    from OCC.Core.STEPControl import STEPControl_Writer
+    from OCC.Core.STEPControl import STEPControl_ShellBasedSurfaceModel
+    from OCC.Core.STEPControl import STEPControl_ManifoldSolidBrep
+    from OCC.Core.STEPControl import STEPControl_GeometricCurveSet
+    from OCC.Core.IGESControl import IGESControl_Reader
+    from OCC.Core.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
+    
 
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_BooleanOperation
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from OCC.Core.BOPAlgo import BOPAlgo_CUT
 
-from OCC.BRepAlgoAPI import BRepAlgoAPI_BooleanOperation
-from OCC.BRepAlgoAPI import BRepAlgoAPI_Cut
-from OCC.BOPAlgo import BOPAlgo_CUT
+    pass
+else:
+    from OCC.TopoDS import topods
+    
+    from OCC.TopoDS import TopoDS_Face
+    from OCC.TopoDS import TopoDS_Shape
+    from OCC.TopoDS import TopoDS_Compound
+    from OCC.TopoDS import TopoDS_Wire
+    from OCC.TopoDS import TopoDS_Vertex
+    from OCC.TopoDS import TopoDS_Shell
+    from OCC.TopoDS import TopoDS_Solid
+    from OCC.TopoDS import topods_Shell
+    from OCC.TopoDS import topods_Face
+    from OCC.TopoDS import topods_Edge
+    from OCC.TopoDS import topods_Vertex
+    from OCC.BRep import BRep_Builder
+    from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+    from OCC.BRepBuilderAPI import BRepBuilderAPI_MakeWire
+    from OCC.BRep import BRep_Tool
+    from OCC.BRepExtrema import BRepExtrema_DistShapeShape
+    from OCC import BRepLib
+    from OCC.BRepLib import BRepLib_FuseEdges
+    from OCC import BRepOffsetAPI
+    from OCC import BRepOffset
+    from OCC import BRepFeat
+    from OCC import BRepBuilderAPI
+    #from OCC.BRepClass import BRepClass_FacePassiveClassifier
+    from OCC.BRepClass import BRepClass_FaceExplorer
+    from OCC.BRepClass import BRepClass_FClassifier
+    from OCC.ShapeAnalysis import ShapeAnalysis_FreeBoundsProperties
+    from OCC.ShapeAnalysis import ShapeAnalysis_FreeBounds
+    from OCC.ShapeAnalysis import ShapeAnalysis_Surface
+    from OCC.BRepTools import breptools_Read
+    from OCC.TopExp import TopExp_Explorer
+    from OCC.TopAbs import TopAbs_ON
+    from OCC.TopAbs import TopAbs_IN
+    from OCC.TopAbs import TopAbs_OUT
+    from OCC.TopAbs import TopAbs_FACE
+    from OCC.TopAbs import TopAbs_VERTEX
+    from OCC.TopAbs import TopAbs_EDGE
+    from OCC.TopAbs import TopAbs_SHELL
+    from OCC.TopAbs import TopAbs_SOLID
+    from OCC.TopAbs import TopAbs_FORWARD
+    from OCC.TopAbs import TopAbs_REVERSED
+    from OCC.GeomAbs import GeomAbs_Arc
+    from OCC.TopTools import TopTools_ListIteratorOfListOfShape
+    from OCC.TopTools import TopTools_ListOfShape
+    from OCC.TopoDS import TopoDS_Iterator
+    from OCC.GeomLProp import GeomLProp_SLProps
+    from OCC.gp import gp_Pnt2d
+    from OCC.gp import gp_Vec
+    from OCC.gp import gp_Dir
+    from OCC.gp import gp_Pnt
+    from OCC.GEOMAlgo import GEOMAlgo_Splitter
+    from OCC import GeomProjLib
+    from OCC.TColgp import TColgp_Array1OfPnt
+    from OCC.TColgp import TColgp_HArray1OfPnt
+    from OCC.GeomAPI import (GeomAPI_Interpolate, GeomAPI_PointsToBSpline)
+    from OCC.BRepAlgoAPI import BRepAlgoAPI_Section
+    from OCC.GProp import GProp_GProps
+    from OCC.BRepGProp import brepgprop_SurfaceProperties
+    from OCC.BRepGProp import brepgprop_VolumeProperties
+    
+    from OCC.BRepMesh import BRepMesh_IncrementalMesh
+    from OCC.Bnd import Bnd_Box
+    from OCC.BRepBndLib import brepbndlib_Add
+    from OCC.TopLoc import TopLoc_Location
+    
+    from OCC.BRepTools import breptools_Read
+    from OCC.BRepTools import breptools_Write
+    from OCC.STEPControl import STEPControl_Reader
+    from OCC.STEPControl import STEPControl_Writer
+    from OCC.STEPControl import STEPControl_ShellBasedSurfaceModel
+    from OCC.STEPControl import STEPControl_ManifoldSolidBrep
+    from OCC.STEPControl import STEPControl_GeometricCurveSet
+    from OCC.IGESControl import IGESControl_Reader
+    from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
+    
+
+    from OCC.BRepAlgoAPI import BRepAlgoAPI_BooleanOperation
+    from OCC.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from OCC.BOPAlgo import BOPAlgo_CUT
+    pass
 
 
 from .tools import ProjectEdgesOntoFace,FindOCCPointNormal,SelectFaceByPointNormal,OCCPointInFace

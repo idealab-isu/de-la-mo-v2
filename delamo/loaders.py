@@ -17,20 +17,46 @@ import sys
 import os
 import os.path
 
-from OCC.TopoDS import topods
-from OCC.TopoDS import TopoDS_Face
-from OCC.TopoDS import TopoDS_Shape
-from OCC.BRep import BRep_Builder
-from OCC.BRep import BRep_Tool
-from OCC.BRepTools import breptools_Read
-from OCC.TopExp import TopExp_Explorer
-from OCC.TopAbs import TopAbs_FACE
+# Old pythonocc defined core functionality directly in OCC
+# New pythonocc defines it in OCC.core
+use_OCC_core=False
+try:
+    import OCC.TopoDS
+    pass
+except ImportError:
+    use_OCC_core=True
+    pass
 
-from OCC.STEPControl import STEPControl_Reader
-from OCC.IGESControl import IGESControl_Reader
-from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
-#from OCC.Display.SimpleGui import init_display
+if use_OCC_core:
+    from OCC.Core.TopoDS import topods
+    from OCC.Core.TopoDS import TopoDS_Face
+    from OCC.Core.TopoDS import TopoDS_Shape
+    from OCC.Core.BRep import BRep_Builder
+    from OCC.Core.BRep import BRep_Tool
+    from OCC.Core.BRepTools import breptools_Read
+    from OCC.Core.TopExp import TopExp_Explorer
+    from OCC.Core.TopAbs import TopAbs_FACE
 
+    from OCC.Core.STEPControl import STEPControl_Reader
+    from OCC.Core.IGESControl import IGESControl_Reader
+    from OCC.Core.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
+    #from OCC.Core.Display.SimpleGui import init_display
+    pass
+else:
+    from OCC.TopoDS import topods
+    from OCC.TopoDS import TopoDS_Face
+    from OCC.TopoDS import TopoDS_Shape
+    from OCC.BRep import BRep_Builder
+    from OCC.BRep import BRep_Tool
+    from OCC.BRepTools import breptools_Read
+    from OCC.TopExp import TopExp_Explorer
+    from OCC.TopAbs import TopAbs_FACE
+
+    from OCC.STEPControl import STEPControl_Reader
+    from OCC.IGESControl import IGESControl_Reader
+    from OCC.IFSelect import IFSelect_RetDone, IFSelect_ItemsByEntity
+    #from OCC.Display.SimpleGui import init_display
+    pass
 
 
 def load_brep(BRepFile):
